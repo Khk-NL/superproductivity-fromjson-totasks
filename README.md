@@ -9,12 +9,12 @@ Paste either one object or an array of objects:
 ```json
 [
   {
-    "title": "Экспортировать Marketing CV v1 в PDF",
-    "project": "Работа",
-    "tags": ["Сегодня"],
+    "title": "Some title",
+    "project": "Some project",
+    "tags": ["Today"],
     "estimateMinutes": 30,
     "dueDay": "2026-08-07",
-    "notes": "Критерий готовности: финальный PDF лежит локально."
+    "notes": "Some note"
   },
   {
     "title": "Prepare release notes",
