@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JSON to Tasks</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+
+      body {
+        margin: 0;
+        padding: var(--s3);
+        color: var(--text-color);
+        background: var(--bg);
+        font-family: var(--font-primary-stack);
+      }
+
+      main {
+        max-width: 1080px;
+        margin: 0 auto;
+        display: grid;
+        gap: var(--s3);
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: var(--s2);
+        flex-wrap: wrap;
+      }
+
+      h1 {
+        margin: 0 0 var(--s-half);
+        font-size: 1.5rem;
+        font-weight: 600;
+      }
+
+      p {
+        margin: 0;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+        gap: var(--s3);
+        align-items: start;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: var(--s);
+        flex-wrap: wrap;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 420px;
+        resize: vertical;
+        box-sizing: border-box;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.9rem;
+        line-height: 1.45;
+      }
+
+      .panel {
+        display: grid;
+        gap: var(--s2);
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--s);
+      }
+
+      .metric {
+        border: 1px solid var(--divider-color);
+        border-radius: 6px;
+        padding: var(--s);
+        background: var(--card-bg);
+      }
+
+      .metric strong {
+        display: block;
+        font-size: 1.35rem;
+      }
+
+      .preview {
+        max-height: 420px;
+        overflow: auto;
+        border: 1px solid var(--divider-color);
+        border-radius: 6px;
+        background: var(--card-bg);
+      }
+
+      .preview-item {
+        padding: var(--s);
+        border-bottom: 1px solid var(--divider-color);
+      }
+
+      .preview-item:last-child {
+        border-bottom: 0;
+      }
+
+      .preview-title {
+        font-weight: 600;
+        overflow-wrap: anywhere;
+      }
+
+      .preview-meta {
+        margin-top: var(--s-half);
+        display: flex;
+        gap: var(--s-half);
+        flex-wrap: wrap;
+      }
+
+      code,
+      .pill {
+        font-size: 0.78rem;
+        border-radius: 999px;
+        padding: 2px 7px;
+        background: var(--bg-darker);
+      }
+
+      .messages {
+        display: grid;
+        gap: var(--s-half);
+      }
+
+      .message {
+        border-radius: 6px;
+        padding: var(--s);
+        border: 1px solid var(--divider-color);
+        overflow-wrap: anywhere;
+      }
+
+      .message.error {
+        border-color: var(--c-warn);
+        color: var(--c-warn);
+      }
+
+      .message.warning {
+        border-color: var(--c-accent);
+      }
+
+      .actions {
+        display: flex;
+        gap: var(--s);
+        flex-wrap: wrap;
+      }
+
+      @media (max-width: 820px) {
+        body {
+          padding: var(--s2);
+        }
+
+        .layout,
+        .summary {
+          grid-template-columns: 1fr;
+        }
+
+        textarea {
+          min-height: 320px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page-fade">
+      <header>
+        <div>
+          <h1>JSON to Tasks</h1>
+          <p class="text-muted">Paste JSON, validate it, then create tasks.</p>
+        </div>
+        <div class="toolbar">
+          <button id="sampleBtn" class="btn-outline" type="button">Sample</button>
+          <button id="clearBtn" type="button">Clear</button>
+        </div>
+      </header>
+
+      <section class="layout">
+        <div class="panel">
+          <textarea
+            id="jsonInput"
+            spellcheck="false"
+            placeholder='[{"title":"Write status update","notes":"Optional notes","estimateMinutes":25,"dueDay":"2026-08-07"}]'
+          ></textarea>
+          <div class="actions">
+            <button id="validateBtn" type="button">Validate</button>
+            <button id="createBtn" class="btn-primary" type="button">Create Tasks</button>
+          </div>
+        </div>
+
+        <aside class="panel">
+          <div class="summary">
+            <div class="metric">
+              <span class="text-muted">Tasks</span>
+              <strong id="taskCount">0</strong>
+            </div>
+            <div class="metric">
+              <span class="text-muted">Subtasks</span>
+              <strong id="subtaskCount">0</strong>
+            </div>
+            <div class="metric">
+              <span class="text-muted">Errors</span>
+              <strong id="errorCount">0</strong>
+            </div>
+          </div>
+          <div id="messages" class="messages"></div>
+          <div id="preview" class="preview"></div>
+        </aside>
+      </section>
+    </main>
+
+    <script>
+      const inputEl = document.getElementById('jsonInput');
+      const previewEl = document.getElementById('preview');
+      const messagesEl = document.getElementById('messages');
+      const taskCountEl = document.getElementById('taskCount');
+      const subtaskCountEl = document.getElementById('subtaskCount');
+      const errorCountEl = document.getElementById('errorCount');
+      const validateBtn = document.getElementById('validateBtn');
+      const createBtn = document.getElementById('createBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const sampleBtn = document.getElementById('sampleBtn');
+
+      let cachedProjects = [];
+      let cachedTags = [];
+
+      const sampleJson = [
+        {
+          title: 'Prepare release notes',
+          notes: 'Mention the JSON import plugin.',
+          estimateMinutes: 30,
+          dueDay: '2026-08-07',
+          isDone: false,
+          tags: [],
+          subTasks: [
+            {
+              title: 'Collect merged changes',
+              estimateMinutes: 15
+            }
+          ]
+        }
+      ];
+
+      const optionalKeys = [
+        'projectId',
+        'tagIds',
+        'notes',
+        'timeEstimate',
+        'parentId',
+        'isDone',
+        'dueDay',
+        'timeSpent',
+        'remindAt',
+        'dueWithTime',
+        'repeatCfgId',
+        'issueId',
+        'issueProviderId',
+        'issuePoints'
+      ];
+
+      const postCreateFieldTypes = {
+        timeSpent: 'number',
+        timeSpentOnDay: 'object',
+        doneOn: 'nullableNumber',
+        attachments: 'array',
+        remindAt: 'nullableNumber',
+        dueWithTime: 'nullableNumber',
+        repeatCfgId: 'nullableString',
+        issueId: 'nullableString',
+        issueProviderId: 'nullableString',
+        issueType: 'any',
+        issueWasUpdated: 'boolean',
+        issueLastUpdated: 'nullableNumber',
+        issueAttachmentNr: 'number',
+        issuePoints: 'nullableNumber'
+      };
+
+      function asArray(value) {
+        return Array.isArray(value) ? value : [value];
+      }
+
+      function isPlainObject(value) {
+        return value !== null && typeof value === 'object' && !Array.isArray(value);
+      }
+
+      function firstString(source, keys) {
+        for (const key of keys) {
+          if (typeof source[key] === 'string' && source[key].trim()) {
+            return source[key].trim();
+          }
+        }
+        return undefined;
+      }
+
+      function toNumber(value) {
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (typeof value === 'string' && value.trim() !== '') {
+          const parsed = Number(value);
+          if (Number.isFinite(parsed)) return parsed;
+        }
+        return undefined;
+      }
+
+      function toBoolean(value) {
+        if (typeof value === 'boolean') return value;
+        if (typeof value === 'string') {
+          const normalized = value.trim().toLowerCase();
+          if (['true', 'yes', '1', 'done'].includes(normalized)) return true;
+          if (['false', 'no', '0', 'open', 'todo'].includes(normalized)) return false;
+        }
+        return undefined;
+      }
+
+      function toDateOnly(value) {
+        if (typeof value !== 'string' || !value.trim()) return undefined;
+        const trimmed = value.trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+        const date = new Date(trimmed);
+        if (Number.isNaN(date.getTime())) return undefined;
+        return date.toISOString().slice(0, 10);
+      }
+
+      function byIdOrTitle(collection, value) {
+        if (typeof value !== 'string' || !value.trim()) return undefined;
+        const normalized = value.trim().toLowerCase();
+        const item = collection.find((entry) => {
+          return entry.id === value || String(entry.title || '').trim().toLowerCase() === normalized;
+        });
+        return item ? item.id : undefined;
+      }
+
+      function listTitles(collection) {
+        return collection
+          .map((entry) => entry.title)
+          .filter(Boolean)
+          .slice(0, 8)
+          .join(', ');
+      }
+
+      function isTodayAlias(value) {
+        if (typeof value !== 'string') return false;
+        return ['today', 'сегодня', 'todays', 'today tag'].includes(value.trim().toLowerCase());
+      }
+
+      function resolveProjectId(source, errors, path) {
+        if (source.projectId !== undefined && source.projectId !== null) {
+          if (typeof source.projectId === 'string' && source.projectId.trim()) {
+            return source.projectId.trim();
+          }
+          errors.push(`${path}.projectId must be a non-empty project id string.`);
+          return undefined;
+        }
+
+        if (source.project !== undefined && source.project !== null) {
+          const id = byIdOrTitle(cachedProjects, source.project);
+          if (id) return id;
+          const available = listTitles(cachedProjects);
+          errors.push(
+            `${path}.project "${source.project}" was not found. Use an existing project title or projectId.${available ? ` Available projects: ${available}.` : ''}`
+          );
+        }
+
+        return undefined;
+      }
+
+      function tagIdsFrom(source, warnings, errors, path) {
+        const isIdsInput = source.tagIds !== undefined && source.tagIds !== null;
+        const value = isIdsInput ? source.tagIds : source.tags;
+        if (value === undefined || value === null) return undefined;
+        const rawTags = Array.isArray(value) ? value : [value];
+        const ids = [];
+        rawTags.forEach((tag, index) => {
+          if (isTodayAlias(tag)) {
+            warnings.push(`${path}.${isIdsInput ? 'tagIds' : 'tags'}[${index}] "${tag}" is the Today view, not a normal tag. It was ignored; use dueDay for scheduling.`);
+            return;
+          }
+
+          if (isIdsInput) {
+            if (typeof tag === 'string' && tag.trim()) {
+              ids.push(tag.trim());
+            } else {
+              errors.push(`${path}.tagIds[${index}] must be a non-empty tag id string.`);
+            }
+            return;
+          }
+
+          const id = byIdOrTitle(cachedTags, tag);
+          if (id) {
+            ids.push(id);
+          } else {
+            const available = listTitles(cachedTags);
+            errors.push(
+              `${path}.tags[${index}] "${tag}" was not found. Use an existing tag title or tagIds.${available ? ` Available tags: ${available}.` : ''}`
+            );
+          }
+        });
+        return ids.length ? ids : undefined;
+      }
+
+      function readPostCreateUpdates(source, warnings, path) {
+        const updates = {};
+        Object.entries(postCreateFieldTypes).forEach(([key, type]) => {
+          if (!Object.prototype.hasOwnProperty.call(source, key)) return;
+          const value = source[key];
+          if (value === null && type.startsWith('nullable')) {
+            updates[key] = null;
+            return;
+          }
+          if (type === 'any') {
+            updates[key] = value;
+            return;
+          }
+          if (type === 'number' || type === 'nullableNumber') {
+            const numberValue = toNumber(value);
+            if (numberValue !== undefined) {
+              updates[key] = Math.round(numberValue);
+            } else {
+              warnings.push(`${path}.${key} must be a number and was ignored.`);
+            }
+            return;
+          }
+          if (type === 'boolean') {
+            const boolValue = toBoolean(value);
+            if (boolValue !== undefined) {
+              updates[key] = boolValue;
+            } else {
+              warnings.push(`${path}.${key} must be a boolean and was ignored.`);
+            }
+            return;
+          }
+          if (type === 'nullableString') {
+            if (typeof value === 'string') {
+              updates[key] = value;
+            } else {
+              warnings.push(`${path}.${key} must be a string or null and was ignored.`);
+            }
+            return;
+          }
+          if (type === 'array') {
+            if (Array.isArray(value)) {
+              updates[key] = value;
+            } else {
+              warnings.push(`${path}.${key} must be an array and was ignored.`);
+            }
+            return;
+          }
+          if (type === 'object') {
+            if (isPlainObject(value)) {
+              updates[key] = value;
+            } else {
+              warnings.push(`${path}.${key} must be an object and was ignored.`);
+            }
+          }
+        });
+        return updates;
+      }
+
+      function normalizeTask(source, path, parentId, warnings, errors, normalized) {
+        if (!isPlainObject(source)) {
+          errors.push(`${path} must be an object.`);
+          return;
+        }
+
+        const title = firstString(source, ['title', 'name', 'summary']);
+        if (!title) {
+          errors.push(`${path}.title is required and must be a non-empty string.`);
+          return;
+        }
+
+        const data = { title };
+        const notes = firstString(source, ['notes', 'description', 'note', 'content']);
+        const estimateMs = toNumber(source.timeEstimate ?? source.estimateMs);
+        const estimateMinutes = toNumber(source.estimateMinutes ?? source.estimateMin ?? source.minutes);
+        const isDone = toBoolean(source.isDone ?? source.done ?? source.completed);
+        const dueDay = toDateOnly(source.dueDay ?? source.dueDate ?? source.date);
+        const hasDueInput = source.dueDay !== undefined || source.dueDate !== undefined || source.date !== undefined;
+        const projectId = resolveProjectId(source, errors, path);
+        const tagIds = tagIdsFrom(source, warnings, errors, path);
+        const directParentId = firstString(source, ['parentId']);
+
+        if (notes !== undefined) data.notes = notes;
+        if (estimateMs !== undefined && estimateMs >= 0) data.timeEstimate = Math.round(estimateMs);
+        if (estimateMs === undefined && estimateMinutes !== undefined && estimateMinutes >= 0) {
+          data.timeEstimate = Math.round(estimateMinutes * 60000);
+        }
+        if (isDone !== undefined) data.isDone = isDone;
+        if (dueDay !== undefined) data.dueDay = dueDay;
+        if (hasDueInput && dueDay === undefined) {
+          errors.push(`${path}.dueDay must be YYYY-MM-DD or another parseable date string.`);
+        }
+        if (projectId !== undefined) data.projectId = projectId;
+        if (tagIds !== undefined) data.tagIds = tagIds;
+        if (parentId !== undefined) data.parentId = parentId;
+        if (parentId === undefined && directParentId !== undefined) data.parentId = directParentId;
+        const postCreateUpdates = readPostCreateUpdates(source, warnings, path);
+
+        const ignored = Object.keys(source).filter((key) => {
+          return ![
+            'title',
+            'name',
+            'summary',
+            'projectId',
+            'project',
+            'tagIds',
+            'tags',
+            'notes',
+            'description',
+            'note',
+            'content',
+            'timeEstimate',
+            'estimateMs',
+            'estimateMinutes',
+            'estimateMin',
+            'minutes',
+            'parentId',
+            'isDone',
+            'done',
+            'completed',
+            'dueDay',
+            'dueDate',
+            'date',
+            'subTasks',
+            'subtasks',
+            'children'
+          ].includes(key) && !Object.prototype.hasOwnProperty.call(postCreateFieldTypes, key);
+        });
+        if (ignored.length) {
+          warnings.push(`${path} ignored unsupported field(s): ${ignored.join(', ')}.`);
+        }
+
+        const children = source.subTasks ?? source.subtasks ?? source.children;
+        const item = { path, data, postCreateUpdates, children: [] };
+        normalized.push(item);
+
+        if (children !== undefined) {
+          if (!Array.isArray(children)) {
+            errors.push(`${path}.subTasks must be an array when provided.`);
+          } else {
+            item.children = children.map((child, index) => {
+              const childItems = [];
+              normalizeTask(child, `${path}.subTasks[${index}]`, '__PARENT__', warnings, errors, childItems);
+              return childItems[0] || null;
+            }).filter(Boolean);
+          }
+        }
+      }
+
+      function flattenPreview(items, depth = 0, out = []) {
+        for (const item of items) {
+          out.push({ item, depth });
+          flattenPreview(item.children, depth + 1, out);
+        }
+        return out;
+      }
+
+      async function loadLookups() {
+        try {
+          const [projects, tags] = await Promise.all([
+            PluginAPI.getAllProjects ? PluginAPI.getAllProjects() : [],
+            PluginAPI.getAllTags ? PluginAPI.getAllTags() : []
+          ]);
+          cachedProjects = projects || [];
+          cachedTags = tags || [];
+        } catch (error) {
+          cachedProjects = [];
+          cachedTags = [];
+        }
+      }
+
+      async function validateInput() {
+        await loadLookups();
+        const warnings = [];
+        const errors = [];
+        const roots = [];
+        const raw = inputEl.value.trim();
+
+        if (!raw) {
+          errors.push('JSON input is empty.');
+          render({ roots, warnings, errors });
+          return { roots, warnings, errors };
+        }
+
+        try {
+          const parsed = JSON.parse(raw);
+          const list = asArray(parsed);
+          list.forEach((task, index) => {
+            normalizeTask(task, Array.isArray(parsed) ? `tasks[${index}]` : 'task', undefined, warnings, errors, roots);
+          });
+        } catch (error) {
+          errors.push(`Invalid JSON: ${error.message}`);
+        }
+
+        render({ roots, warnings, errors });
+        return { roots, warnings, errors };
+      }
+
+      function render(result) {
+        const flat = flattenPreview(result.roots);
+        const subtaskCount = flat.filter((entry) => entry.depth > 0).length;
+        taskCountEl.textContent = String(flat.length);
+        subtaskCountEl.textContent = String(subtaskCount);
+        errorCountEl.textContent = String(result.errors.length);
+
+        messagesEl.innerHTML = '';
+        [...result.errors.map((text) => ['error', text]), ...result.warnings.map((text) => ['warning', text])]
+          .slice(0, 20)
+          .forEach(([type, text]) => {
+            const el = document.createElement('div');
+            el.className = `message ${type}`;
+            el.textContent = text;
+            messagesEl.appendChild(el);
+          });
+
+        previewEl.innerHTML = '';
+        if (!flat.length) {
+          const empty = document.createElement('div');
+          empty.className = 'preview-item text-muted';
+          empty.textContent = 'No valid tasks yet.';
+          previewEl.appendChild(empty);
+          return;
+        }
+
+        flat.slice(0, 100).forEach(({ item, depth }) => {
+          const el = document.createElement('div');
+          el.className = 'preview-item';
+          el.style.paddingLeft = `calc(var(--s) + ${depth * 18}px)`;
+
+          const title = document.createElement('div');
+          title.className = 'preview-title';
+          title.textContent = item.data.title;
+          el.appendChild(title);
+
+          const meta = document.createElement('div');
+          meta.className = 'preview-meta';
+          optionalKeys.forEach((key) => {
+            const valueSource = Object.prototype.hasOwnProperty.call(item.data, key)
+              ? item.data
+              : item.postCreateUpdates;
+            if (valueSource[key] !== undefined && valueSource[key] !== null) {
+              const pill = document.createElement('span');
+              pill.className = 'pill';
+              const value = Array.isArray(valueSource[key]) ? valueSource[key].join(', ') : String(valueSource[key]);
+              pill.textContent = `${key}: ${value}`;
+              meta.appendChild(pill);
+            }
+          });
+          if (meta.childNodes.length) el.appendChild(meta);
+          previewEl.appendChild(el);
+        });
+
+        if (flat.length > 100) {
+          const more = document.createElement('div');
+          more.className = 'preview-item text-muted';
+          more.textContent = `${flat.length - 100} more task(s) hidden from preview.`;
+          previewEl.appendChild(more);
+        }
+      }
+
+      async function createTree(items, parentId) {
+        let count = 0;
+        for (const item of items) {
+          const data = { ...item.data };
+          if (data.parentId === '__PARENT__') {
+            data.parentId = parentId || null;
+          }
+          let createdId;
+          try {
+            createdId = await PluginAPI.addTask(data);
+          } catch (error) {
+            throw new Error(`${item.path}: addTask failed for "${data.title}". Sent fields: ${JSON.stringify(data)}. Host error: ${error.message || String(error)}`);
+          }
+          if (Object.keys(item.postCreateUpdates).length && PluginAPI.updateTask) {
+            try {
+              await PluginAPI.updateTask(createdId, item.postCreateUpdates);
+            } catch (error) {
+              throw new Error(`${item.path}: updateTask failed for "${data.title}". Sent fields: ${JSON.stringify(item.postCreateUpdates)}. Host error: ${error.message || String(error)}`);
+            }
+          }
+          count += 1;
+          count += await createTree(item.children, createdId);
+        }
+        return count;
+      }
+
+      async function createTasks() {
+        createBtn.disabled = true;
+        try {
+          const result = await validateInput();
+          if (result.errors.length) {
+            PluginAPI.showSnack({ msg: 'Fix JSON errors before creating tasks.', type: 'ERROR' });
+            return;
+          }
+
+          const flat = flattenPreview(result.roots);
+          if (!flat.length) {
+            PluginAPI.showSnack({ msg: 'No tasks to create.', type: 'WARNING' });
+            return;
+          }
+
+          if (flat.length > 20 && PluginAPI.openDialog) {
+            const answer = await PluginAPI.openDialog({
+              title: 'Create tasks?',
+              htmlContent: `<p>This will create <strong>${flat.length}</strong> tasks.</p>`,
+              buttons: [
+                { label: 'Cancel' },
+                { label: 'Create', color: 'primary', raised: true }
+              ]
+            });
+            if (answer !== 'Create') return;
+          }
+
+          const createdCount = await createTree(result.roots);
+          PluginAPI.showSnack({
+            msg: `Created ${createdCount} task${createdCount === 1 ? '' : 's'}.`,
+            type: 'SUCCESS'
+          });
+        } catch (error) {
+          PluginAPI.showSnack({ msg: `Failed to create tasks: ${error.message}`, type: 'ERROR' });
+        } finally {
+          createBtn.disabled = false;
+        }
+      }
+
+      validateBtn.addEventListener('click', validateInput);
+      createBtn.addEventListener('click', createTasks);
+      clearBtn.addEventListener('click', () => {
+        inputEl.value = '';
+        render({ roots: [], warnings: [], errors: [] });
+      });
+      sampleBtn.addEventListener('click', () => {
+        inputEl.value = JSON.stringify(sampleJson, null, 2);
+        validateInput();
+      });
+
+      render({ roots: [], warnings: [], errors: [] });
+    </script>
+  </body>
+</html>

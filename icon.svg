@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="JSON to Tasks">
+  <rect width="64" height="64" rx="12" fill="#4a90e2"/>
+  <path d="M19 24c-3 0-5 2-5 5v6c0 3-1 5-4 5v6c7 0 10-4 10-11v-5c0-2 1-3 3-3h2v-3h-2c-2 0-3-1-3-3v-5c0-7-3-11-10-11v6c3 0 4 2 4 5v6c0 3 2 5 5 5z" fill="#fff"/>
+  <path d="M45 24c3 0 5 2 5 5v6c0 3 1 5 4 5v6c-7 0-10-4-10-11v-5c0-2-1-3-3-3h-2v-3h2c2 0 3-1 3-3v-5c0-7 3-11 10-11v6c-3 0-4 2-4 5v6c0 3-2 5-5 5z" fill="#fff"/>
+  <path d="M28 22h8v5h-8zm0 10h8v5h-8zm0 10h8v5h-8z" fill="#fff"/>
+</svg>
