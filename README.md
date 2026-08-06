@@ -4,32 +4,48 @@ Super Productivity plugin for creating tasks from pasted JSON.
 
 ## Supported Input
 
-Paste either one object or an array of objects:
+Paste either one task object or an array of task objects.
+
+```json
+{
+  "title": "Draft customer onboarding checklist",
+  "project": "Client Launch",
+  "tags": ["Writing", "High Priority"],
+  "estimateMinutes": 45,
+  "dueDay": "2026-08-07",
+  "notes": "Definition of done: first draft is ready for review."
+}
+```
 
 ```json
 [
   {
-    "title": "Экспортировать Marketing CV v1 в PDF",
-    "project": "Работа",
-    "tags": ["Сегодня"],
-    "estimateMinutes": 30,
-    "dueDay": "2026-08-07",
-    "notes": "Критерий готовности: финальный PDF лежит локально."
-  },
-  {
     "title": "Prepare release notes",
-    "notes": "Mention JSON import plugin",
+    "project": "Product Ops",
+    "tags": ["Release", "Writing"],
+    "notes": "Mention the import plugin and migration notes.",
     "timeEstimate": 1800000,
     "dueDay": "2026-08-07",
     "isDone": false,
-    "projectId": "project-id",
-    "tagIds": ["tag-id"],
     "subTasks": [
       {
-        "title": "Collect changes",
+        "title": "Collect merged pull requests",
         "estimateMinutes": 20
+      },
+      {
+        "title": "Send draft to support team",
+        "estimateMinutes": 10,
+        "tags": ["Review"]
       }
     ]
+  },
+  {
+    "title": "Review analytics dashboard",
+    "project": "Growth Experiments",
+    "tags": ["Analytics"],
+    "description": "Check weekly conversion changes before planning.",
+    "estimateMs": 1200000,
+    "date": "2026-08-08"
   }
 ]
 ```
@@ -50,10 +66,10 @@ Convenience aliases:
 - `project` -> `projectId`
 - `subtasks`, `children` -> `subTasks`
 
-`projectId` and `tagIds` are treated as ids. `project` and `tags` are resolved by existing titles. Unknown optional fields are ignored.
+`projectId` and `tagIds` are treated as ids and must exist in Super Productivity. `project` and `tags` are resolved by existing titles. If a title does not exist, the plugin asks whether it should create the missing project or tag before importing.
 
-`Today` / `Сегодня` is a view, not a normal tag. Use `dueDay` to schedule a task for a day.
+`Today` is a view, not a normal tag. Use `dueDay` to schedule a task for a day.
 
 ## Build ZIP
 
-Create a flat ZIP containing `manifest.json`, `plugin.js`, `index.html`, and `icon.svg`, then upload it from Super Productivity settings.
+Create a flat ZIP containing `manifest.json`, `plugin.js`, `index.html`, `icon.svg`, and `README.md`, then upload it from Super Productivity settings.

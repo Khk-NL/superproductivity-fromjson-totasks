@@ -1,7 +1,7 @@
 {
   "id": "json-to-tasks",
   "name": "JSON to Tasks",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Create Super Productivity tasks from pasted JSON.",
   "manifestVersion": 1,
   "minSupVersion": "14.0.0",
@@ -11,6 +11,8 @@
   "permissions": [
     "addTask",
     "updateTask",
+    "addProject",
+    "addTag",
     "getActiveWorkContext",
     "getAllProjects",
     "getAllTags"

@@ -343,15 +343,31 @@
           .join(', ');
       }
 
+      function hasKnownId(collection, id) {
+        return collection.some((entry) => entry.id === id);
+      }
+
       function isTodayAlias(value) {
         if (typeof value !== 'string') return false;
         return ['today', 'сегодня', 'todays', 'today tag'].includes(value.trim().toLowerCase());
       }
 
-      function resolveProjectId(source, errors, path) {
+      function addUnique(list, value) {
+        if (!list.includes(value)) list.push(value);
+      }
+
+      function resolveProjectId(source, errors, missingProjects, path) {
         if (source.projectId !== undefined && source.projectId !== null) {
           if (typeof source.projectId === 'string' && source.projectId.trim()) {
-            return source.projectId.trim();
+            const projectId = source.projectId.trim();
+            if (hasKnownId(cachedProjects, projectId)) {
+              return projectId;
+            }
+            const available = listTitles(cachedProjects);
+            errors.push(
+              `${path}.projectId "${projectId}" does not match an existing project id. Use a real project id or use project with an existing title.${available ? ` Available projects: ${available}.` : ''}`
+            );
+            return undefined;
           }
           errors.push(`${path}.projectId must be a non-empty project id string.`);
           return undefined;
@@ -360,16 +376,17 @@
         if (source.project !== undefined && source.project !== null) {
           const id = byIdOrTitle(cachedProjects, source.project);
           if (id) return id;
-          const available = listTitles(cachedProjects);
-          errors.push(
-            `${path}.project "${source.project}" was not found. Use an existing project title or projectId.${available ? ` Available projects: ${available}.` : ''}`
-          );
+          if (typeof source.project === 'string' && source.project.trim()) {
+            addUnique(missingProjects, source.project.trim());
+          } else {
+            errors.push(`${path}.project must be a non-empty project title string.`);
+          }
         }
 
         return undefined;
       }
 
-      function tagIdsFrom(source, warnings, errors, path) {
+      function tagIdsFrom(source, warnings, errors, missingTags, path) {
         const isIdsInput = source.tagIds !== undefined && source.tagIds !== null;
         const value = isIdsInput ? source.tagIds : source.tags;
         if (value === undefined || value === null) return undefined;
@@ -383,7 +400,15 @@
 
           if (isIdsInput) {
             if (typeof tag === 'string' && tag.trim()) {
-              ids.push(tag.trim());
+              const tagId = tag.trim();
+              if (hasKnownId(cachedTags, tagId)) {
+                ids.push(tagId);
+              } else {
+                const available = listTitles(cachedTags);
+                errors.push(
+                  `${path}.tagIds[${index}] "${tagId}" does not match an existing tag id. Use a real tag id or use tags with existing tag titles.${available ? ` Available tags: ${available}.` : ''}`
+                );
+              }
             } else {
               errors.push(`${path}.tagIds[${index}] must be a non-empty tag id string.`);
             }
@@ -394,10 +419,11 @@
           if (id) {
             ids.push(id);
           } else {
-            const available = listTitles(cachedTags);
-            errors.push(
-              `${path}.tags[${index}] "${tag}" was not found. Use an existing tag title or tagIds.${available ? ` Available tags: ${available}.` : ''}`
-            );
+            if (typeof tag === 'string' && tag.trim()) {
+              addUnique(missingTags, tag.trim());
+            } else {
+              errors.push(`${path}.tags[${index}] must be a non-empty tag title string.`);
+            }
           }
         });
         return ids.length ? ids : undefined;
@@ -461,7 +487,7 @@
         return updates;
       }
 
-      function normalizeTask(source, path, parentId, warnings, errors, normalized) {
+      function normalizeTask(source, path, parentId, warnings, errors, missingProjects, missingTags, normalized) {
         if (!isPlainObject(source)) {
           errors.push(`${path} must be an object.`);
           return;
@@ -480,8 +506,8 @@
         const isDone = toBoolean(source.isDone ?? source.done ?? source.completed);
         const dueDay = toDateOnly(source.dueDay ?? source.dueDate ?? source.date);
         const hasDueInput = source.dueDay !== undefined || source.dueDate !== undefined || source.date !== undefined;
-        const projectId = resolveProjectId(source, errors, path);
-        const tagIds = tagIdsFrom(source, warnings, errors, path);
+        const projectId = resolveProjectId(source, errors, missingProjects, path);
+        const tagIds = tagIdsFrom(source, warnings, errors, missingTags, path);
         const directParentId = firstString(source, ['parentId']);
 
         if (notes !== undefined) data.notes = notes;
@@ -544,7 +570,7 @@
           } else {
             item.children = children.map((child, index) => {
               const childItems = [];
-              normalizeTask(child, `${path}.subTasks[${index}]`, '__PARENT__', warnings, errors, childItems);
+              normalizeTask(child, `${path}.subTasks[${index}]`, '__PARENT__', warnings, errors, missingProjects, missingTags, childItems);
               return childItems[0] || null;
             }).filter(Boolean);
           }
@@ -577,27 +603,36 @@
         await loadLookups();
         const warnings = [];
         const errors = [];
+        const missingProjects = [];
+        const missingTags = [];
         const roots = [];
         const raw = inputEl.value.trim();
 
         if (!raw) {
           errors.push('JSON input is empty.');
-          render({ roots, warnings, errors });
-          return { roots, warnings, errors };
+          render({ roots, warnings, errors, missingProjects, missingTags });
+          return { roots, warnings, errors, missingProjects, missingTags };
         }
 
         try {
           const parsed = JSON.parse(raw);
           const list = asArray(parsed);
           list.forEach((task, index) => {
-            normalizeTask(task, Array.isArray(parsed) ? `tasks[${index}]` : 'task', undefined, warnings, errors, roots);
+            normalizeTask(task, Array.isArray(parsed) ? `tasks[${index}]` : 'task', undefined, warnings, errors, missingProjects, missingTags, roots);
           });
         } catch (error) {
           errors.push(`Invalid JSON: ${error.message}`);
         }
 
-        render({ roots, warnings, errors });
-        return { roots, warnings, errors };
+        missingProjects.forEach((title) => {
+          warnings.push(`Project "${title}" does not exist. It can be created before importing.`);
+        });
+        missingTags.forEach((title) => {
+          warnings.push(`Tag "${title}" does not exist. It can be created before importing.`);
+        });
+
+        render({ roots, warnings, errors, missingProjects, missingTags });
+        return { roots, warnings, errors, missingProjects, missingTags };
       }
 
       function render(result) {
@@ -688,13 +723,67 @@
         return count;
       }
 
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#39;');
+      }
+
+      async function createMissingEntities(result) {
+        const hasMissing = result.missingProjects.length || result.missingTags.length;
+        if (!hasMissing) return true;
+        if (!PluginAPI.openDialog) return false;
+
+        const parts = [];
+        if (result.missingProjects.length) {
+          parts.push(`<p><strong>Projects:</strong> ${result.missingProjects.map(escapeHtml).join(', ')}</p>`);
+        }
+        if (result.missingTags.length) {
+          parts.push(`<p><strong>Tags:</strong> ${result.missingTags.map(escapeHtml).join(', ')}</p>`);
+        }
+
+        const answer = await PluginAPI.openDialog({
+          title: 'Create missing projects and tags?',
+          htmlContent: parts.join(''),
+          buttons: [
+            { label: 'Cancel' },
+            { label: 'Create', color: 'primary', raised: true }
+          ]
+        });
+        if (answer !== 'Create') return false;
+
+        for (const title of result.missingProjects) {
+          await PluginAPI.addProject({ title });
+        }
+        for (const title of result.missingTags) {
+          await PluginAPI.addTag({ title });
+        }
+        return true;
+      }
+
       async function createTasks() {
         createBtn.disabled = true;
         try {
-          const result = await validateInput();
+          let result = await validateInput();
           if (result.errors.length) {
             PluginAPI.showSnack({ msg: 'Fix JSON errors before creating tasks.', type: 'ERROR' });
             return;
+          }
+
+          if (result.missingProjects.length || result.missingTags.length) {
+            const didCreate = await createMissingEntities(result);
+            if (!didCreate) {
+              PluginAPI.showSnack({ msg: 'Import cancelled. Missing projects or tags were not created.', type: 'INFO' });
+              return;
+            }
+            result = await validateInput();
+            if (result.errors.length || result.missingProjects.length || result.missingTags.length) {
+              PluginAPI.showSnack({ msg: 'Created missing items, but validation still has unresolved entries.', type: 'ERROR' });
+              return;
+            }
           }
 
           const flat = flattenPreview(result.roots);
@@ -731,14 +820,14 @@
       createBtn.addEventListener('click', createTasks);
       clearBtn.addEventListener('click', () => {
         inputEl.value = '';
-        render({ roots: [], warnings: [], errors: [] });
+        render({ roots: [], warnings: [], errors: [], missingProjects: [], missingTags: [] });
       });
       sampleBtn.addEventListener('click', () => {
         inputEl.value = JSON.stringify(sampleJson, null, 2);
         validateInput();
       });
 
-      render({ roots: [], warnings: [], errors: [] });
+      render({ roots: [], warnings: [], errors: [], missingProjects: [], missingTags: [] });
     </script>
   </body>
 </html>
