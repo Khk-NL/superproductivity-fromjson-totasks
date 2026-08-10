@@ -70,6 +70,7 @@ Convenience aliases:
 `Today` is a view, not a normal tag. Use `dueDay` to schedule a task for a day.
 
 Super Productivity supports root tasks and one subtask level. Nested subtasks deeper than that are rejected by this plugin. Subtasks inherit their parent project and tags, so `project`, `projectId`, `tags`, and `tagIds` on subtasks are ignored with a warning.
+Subtask dueDay requires Super Productivity 18.19.0 or newer.
 
 ## Build ZIP
 
