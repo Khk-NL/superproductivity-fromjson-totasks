@@ -323,7 +323,10 @@
         if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
         const date = new Date(trimmed);
         if (Number.isNaN(date.getTime())) return undefined;
-        return date.toISOString().slice(0, 10);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
       }
 
       function byIdOrTitle(collection, value) {
@@ -487,9 +490,13 @@
         return updates;
       }
 
-      function normalizeTask(source, path, parentId, warnings, errors, missingProjects, missingTags, normalized) {
+      function normalizeTask(source, path, parentId, warnings, errors, missingProjects, missingTags, normalized, depth = 0) {
         if (!isPlainObject(source)) {
           errors.push(`${path} must be an object.`);
+          return;
+        }
+        if (depth > 1) {
+          errors.push(`${path} is nested too deeply. Super Productivity supports root tasks and one subtask level only.`);
           return;
         }
 
@@ -506,8 +513,19 @@
         const isDone = toBoolean(source.isDone ?? source.done ?? source.completed);
         const dueDay = toDateOnly(source.dueDay ?? source.dueDate ?? source.date);
         const hasDueInput = source.dueDay !== undefined || source.dueDate !== undefined || source.date !== undefined;
-        const projectId = resolveProjectId(source, errors, missingProjects, path);
-        const tagIds = tagIdsFrom(source, warnings, errors, missingTags, path);
+        const isSubTask = depth > 0 || parentId !== undefined || source.parentId !== undefined;
+        let projectId;
+        let tagIds;
+        if (isSubTask && (source.project !== undefined || source.projectId !== undefined)) {
+          warnings.push(`${path}.project/projectId was ignored because subtasks inherit their parent project.`);
+        } else {
+          projectId = resolveProjectId(source, errors, missingProjects, path);
+        }
+        if (isSubTask && (source.tags !== undefined || source.tagIds !== undefined)) {
+          warnings.push(`${path}.tags/tagIds was ignored because subtasks inherit parent tags in Super Productivity.`);
+        } else {
+          tagIds = tagIdsFrom(source, warnings, errors, missingTags, path);
+        }
         const directParentId = firstString(source, ['parentId']);
 
         if (notes !== undefined) data.notes = notes;
@@ -567,10 +585,12 @@
         if (children !== undefined) {
           if (!Array.isArray(children)) {
             errors.push(`${path}.subTasks must be an array when provided.`);
+          } else if ((depth >= 1 || directParentId !== undefined) && children.length) {
+            errors.push(`${path}.subTasks is not supported. Super Productivity supports root tasks and one subtask level only.`);
           } else {
             item.children = children.map((child, index) => {
               const childItems = [];
-              normalizeTask(child, `${path}.subTasks[${index}]`, '__PARENT__', warnings, errors, missingProjects, missingTags, childItems);
+              normalizeTask(child, `${path}.subTasks[${index}]`, '__PARENT__', warnings, errors, missingProjects, missingTags, childItems, depth + 1);
               return childItems[0] || null;
             }).filter(Boolean);
           }
@@ -697,8 +717,7 @@
         }
       }
 
-      async function createTree(items, parentId) {
-        let count = 0;
+      async function createTree(items, parentId, stats) {
         for (const item of items) {
           const data = { ...item.data };
           if (data.parentId === '__PARENT__') {
@@ -708,19 +727,18 @@
           try {
             createdId = await PluginAPI.addTask(data);
           } catch (error) {
-            throw new Error(`${item.path}: addTask failed for "${data.title}". Sent fields: ${JSON.stringify(data)}. Host error: ${error.message || String(error)}`);
+            throw new Error(`${item.path}: addTask failed for "${data.title}" after ${stats.tasksCreated} task(s) had already been created. Sent fields: ${JSON.stringify(data)}. Host error: ${error.message || String(error)}`);
           }
+          stats.tasksCreated += 1;
           if (Object.keys(item.postCreateUpdates).length && PluginAPI.updateTask) {
             try {
               await PluginAPI.updateTask(createdId, item.postCreateUpdates);
             } catch (error) {
-              throw new Error(`${item.path}: updateTask failed for "${data.title}". Sent fields: ${JSON.stringify(item.postCreateUpdates)}. Host error: ${error.message || String(error)}`);
+              throw new Error(`${item.path}: updateTask failed for "${data.title}" after ${stats.tasksCreated} task(s) had already been created. Sent fields: ${JSON.stringify(item.postCreateUpdates)}. Host error: ${error.message || String(error)}`);
             }
           }
-          count += 1;
-          count += await createTree(item.children, createdId);
+          await createTree(item.children, createdId, stats);
         }
-        return count;
       }
 
       function escapeHtml(value) {
@@ -732,7 +750,7 @@
           .replaceAll("'", '&#39;');
       }
 
-      async function createMissingEntities(result) {
+      async function createMissingEntities(result, stats) {
         const hasMissing = result.missingProjects.length || result.missingTags.length;
         if (!hasMissing) return true;
         if (!PluginAPI.openDialog) return false;
@@ -757,14 +775,17 @@
 
         for (const title of result.missingProjects) {
           await PluginAPI.addProject({ title });
+          stats.projectsCreated += 1;
         }
         for (const title of result.missingTags) {
           await PluginAPI.addTag({ title });
+          stats.tagsCreated += 1;
         }
         return true;
       }
 
       async function createTasks() {
+        const stats = { tasksCreated: 0, projectsCreated: 0, tagsCreated: 0 };
         createBtn.disabled = true;
         try {
           let result = await validateInput();
@@ -774,14 +795,14 @@
           }
 
           if (result.missingProjects.length || result.missingTags.length) {
-            const didCreate = await createMissingEntities(result);
-            if (!didCreate) {
+            const createdEntities = await createMissingEntities(result, stats);
+            if (!createdEntities) {
               PluginAPI.showSnack({ msg: 'Import cancelled. Missing projects or tags were not created.', type: 'INFO' });
               return;
             }
             result = await validateInput();
             if (result.errors.length || result.missingProjects.length || result.missingTags.length) {
-              PluginAPI.showSnack({ msg: 'Created missing items, but validation still has unresolved entries.', type: 'ERROR' });
+              PluginAPI.showSnack({ msg: `Created ${stats.projectsCreated} project(s) and ${stats.tagsCreated} tag(s), but validation still has unresolved entries.`, type: 'ERROR' });
               return;
             }
           }
@@ -804,13 +825,16 @@
             if (answer !== 'Create') return;
           }
 
-          const createdCount = await createTree(result.roots);
+          await createTree(result.roots, undefined, stats);
           PluginAPI.showSnack({
-            msg: `Created ${createdCount} task${createdCount === 1 ? '' : 's'}.`,
+            msg: `Created ${stats.tasksCreated} task${stats.tasksCreated === 1 ? '' : 's'}.`,
             type: 'SUCCESS'
           });
         } catch (error) {
-          PluginAPI.showSnack({ msg: `Failed to create tasks: ${error.message}`, type: 'ERROR' });
+          const leftovers = stats.projectsCreated || stats.tagsCreated
+            ? ` Created ${stats.projectsCreated} project(s) and ${stats.tagsCreated} tag(s) before the failure; they may remain.`
+            : '';
+          PluginAPI.showSnack({ msg: `Failed to create tasks: ${error.message}${leftovers}`, type: 'ERROR' });
         } finally {
           createBtn.disabled = false;
         }

@@ -34,8 +34,7 @@ Paste either one task object or an array of task objects.
       },
       {
         "title": "Send draft to support team",
-        "estimateMinutes": 10,
-        "tags": ["Review"]
+        "estimateMinutes": 10
       }
     ]
   },
@@ -69,6 +68,8 @@ Convenience aliases:
 `projectId` and `tagIds` are treated as ids and must exist in Super Productivity. `project` and `tags` are resolved by existing titles. If a title does not exist, the plugin asks whether it should create the missing project or tag before importing.
 
 `Today` is a view, not a normal tag. Use `dueDay` to schedule a task for a day.
+
+Super Productivity supports root tasks and one subtask level. Nested subtasks deeper than that are rejected by this plugin. Subtasks inherit their parent project and tags, so `project`, `projectId`, `tags`, and `tagIds` on subtasks are ignored with a warning.
 
 ## Build ZIP
 
