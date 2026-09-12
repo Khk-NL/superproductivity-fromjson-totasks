@@ -199,6 +199,30 @@
         background: var(--card-bg);
       }
 
+      .help-card {
+        border: 1px solid var(--divider-color);
+        border-radius: 6px;
+        padding: var(--s2);
+        background: var(--card-bg);
+      }
+
+      .help-tabs {
+        display: flex;
+        gap: var(--s);
+        flex-wrap: wrap;
+        margin-bottom: var(--s2);
+      }
+
+      .help-tab[aria-selected="true"] {
+        color: var(--text-color);
+        border-color: var(--c-accent);
+        background: var(--card-bg);
+      }
+
+      .help-panel[hidden] {
+        display: none;
+      }
+
       @media (max-width: 820px) {
         body {
           padding: var(--s2);
@@ -270,12 +294,24 @@
         </aside>
       </section>
 
-      <details>
-        <summary data-i18n="helpTitle">JSON example and field reference</summary>
-        <p class="text-muted" data-i18n="helpIntro">Paste one task object or an array of task objects. Only title is required.</p>
-        <pre><code id="exampleJson"></code></pre>
-        <div id="fieldHelp" class="field-help"></div>
-      </details>
+      <section class="help-card" aria-label="Help">
+        <div class="help-tabs" role="tablist">
+          <button id="fieldsTab" class="help-tab" type="button" role="tab" aria-selected="true" aria-controls="fieldsPanel" data-i18n="fieldsHelpTab">Field reference</button>
+          <button id="multiTaskTab" class="help-tab btn-outline" type="button" role="tab" aria-selected="false" aria-controls="multiTaskPanel" data-i18n="multiTaskHelpTab">Multiple tasks</button>
+        </div>
+        <div id="fieldsPanel" class="help-panel" role="tabpanel" aria-labelledby="fieldsTab">
+          <h2 data-i18n="fieldsHelpTitle">JSON example and field reference</h2>
+          <p class="text-muted" data-i18n="helpIntro">Paste one task object or an array of task objects. Only title is required.</p>
+          <pre><code id="exampleJson"></code></pre>
+          <div id="fieldHelp" class="field-help"></div>
+        </div>
+        <div id="multiTaskPanel" class="help-panel" role="tabpanel" aria-labelledby="multiTaskTab" hidden>
+          <h2 data-i18n="multiTaskHelpTitle">Import multiple tasks</h2>
+          <p class="text-muted" data-i18n="multiTaskHelpIntro">Use an array for multiple tasks, or group tasks by project to avoid repeating the project name.</p>
+          <p data-i18n="multiTaskHelpRules">Project-level project and tags are inherited by tasks. A task's own project or tags take priority. Subtasks inherit their parent task's project and tags.</p>
+          <pre><code id="multiTaskExample"></code></pre>
+        </div>
+      </section>
     </main>
 
     <script>
@@ -292,6 +328,11 @@
       const languageSelect = document.getElementById('languageSelect');
       const exampleJsonEl = document.getElementById('exampleJson');
       const fieldHelpEl = document.getElementById('fieldHelp');
+      const multiTaskExampleEl = document.getElementById('multiTaskExample');
+      const fieldsTabEl = document.getElementById('fieldsTab');
+      const multiTaskTabEl = document.getElementById('multiTaskTab');
+      const fieldsPanelEl = document.getElementById('fieldsPanel');
+      const multiTaskPanelEl = document.getElementById('multiTaskPanel');
 
       const translations = {
         en: {
@@ -308,6 +349,10 @@
           createdEntitiesUnresolved: 'Created {projects} project(s) and {tags} tag(s), but validation still has unresolved entries.',
           leftovers: ' Created {projects} project(s) and {tags} tag(s) before the failure; they may remain.',
           helpTitle: 'JSON example and field reference', helpIntro: 'Paste one task object or an array of task objects. Only title is required.',
+          fieldsHelpTab: 'Field reference', fieldsHelpTitle: 'JSON example and field reference',
+          multiTaskHelpTab: 'Multiple tasks', multiTaskHelpTitle: 'Import multiple tasks',
+          multiTaskHelpIntro: 'Use an array for multiple tasks, or group tasks by project to avoid repeating the project name.',
+          multiTaskHelpRules: "Project-level project and tags are inherited by tasks. A task's own project or tags take priority. Subtasks inherit their parent task's project and tags.",
           required: 'Required', optional: 'Optional', aliases: 'Aliases', inherited: 'Ignored on subtasks because they inherit these values from the parent task.',
           objectRequired: '{path} must be an object.', tooDeep: '{path} is nested too deeply. Super Productivity supports root tasks and one subtask level only.',
           titleRequired: '{path}.title is required and must be a non-empty string.', invalidDueDay: '{path}.dueDay must be YYYY-MM-DD or another parseable date string.',
@@ -330,6 +375,10 @@
           createdEntitiesUnresolved: '已创建 {projects} 个项目和 {tags} 个标签，但校验后仍有未解析的条目。',
           leftovers: ' 失败前已创建 {projects} 个项目和 {tags} 个标签；它们可能会保留。',
           helpTitle: 'JSON 示例与字段说明', helpIntro: '可以粘贴单个任务对象或任务对象数组，只有 title 是必填字段。',
+          fieldsHelpTab: '字段说明', fieldsHelpTitle: 'JSON 示例与字段说明',
+          multiTaskHelpTab: '多任务说明', multiTaskHelpTitle: '多任务导入说明',
+          multiTaskHelpIntro: '多个任务可以使用数组；也可以按项目分组，避免在每个任务中重复填写项目名称。',
+          multiTaskHelpRules: '项目级的项目和标签会继承到任务。任务自身的项目和标签优先。子任务会继承父任务的项目和标签。',
           required: '必填', optional: '可选', aliases: '别名', inherited: '子任务会继承父任务的这些值，因此子任务中的该字段会被忽略。',
           objectRequired: '{path} 必须是对象。', tooDeep: '{path} 嵌套过深；Super Productivity 只支持根任务和一层子任务。',
           titleRequired: '{path}.title 为必填项，且必须是非空字符串。', invalidDueDay: '{path}.dueDay 必须是 YYYY-MM-DD 或其他可解析的日期字符串。',
@@ -431,6 +480,7 @@
           el.placeholder = t(el.dataset.i18nPlaceholder);
         });
         exampleJsonEl.textContent = JSON.stringify(getSampleJson(), null, 2);
+        multiTaskExampleEl.textContent = JSON.stringify(getMultiTaskSampleJson(), null, 2);
         fieldHelpEl.innerHTML = '';
         fieldDescriptions[currentLanguage].forEach(([field, description]) => {
           const fieldEl = document.createElement('div');
@@ -441,6 +491,35 @@
           descriptionEl.textContent = description;
           fieldHelpEl.append(fieldEl, descriptionEl);
         });
+      }
+
+      function getMultiTaskSampleJson() {
+        return {
+          projects: [
+            {
+              title: currentLanguage === 'zh-CN' ? '考研' : 'Study',
+              tags: [currentLanguage === 'zh-CN' ? '学习' : 'Learning'],
+              tasks: [
+                { title: currentLanguage === 'zh-CN' ? '复习链表' : 'Review linked lists', estimateMinutes: 60 },
+                { title: currentLanguage === 'zh-CN' ? '复习二叉树' : 'Review binary trees', tags: [currentLanguage === 'zh-CN' ? '重点' : 'Focus'] }
+              ]
+            },
+            {
+              title: currentLanguage === 'zh-CN' ? '课程' : 'Courses',
+              tasks: [{ title: currentLanguage === 'zh-CN' ? '完成计网作业' : 'Finish networking assignment' }]
+            }
+          ]
+        };
+      }
+
+      function selectHelpPanel(panel) {
+        const showFields = panel === 'fields';
+        fieldsTabEl.setAttribute('aria-selected', String(showFields));
+        multiTaskTabEl.setAttribute('aria-selected', String(!showFields));
+        fieldsPanelEl.hidden = !showFields;
+        multiTaskPanelEl.hidden = showFields;
+        fieldsTabEl.classList.toggle('btn-outline', !showFields);
+        multiTaskTabEl.classList.toggle('btn-outline', showFields);
       }
 
       let cachedProjects = [];
@@ -874,10 +953,65 @@
 
         try {
           const parsed = JSON.parse(raw);
-          const list = asArray(parsed);
-          list.forEach((task, index) => {
-            normalizeTask(task, Array.isArray(parsed) ? `tasks[${index}]` : 'task', undefined, warnings, errors, missingProjects, missingTags, roots);
-          });
+          if (isPlainObject(parsed) && Object.prototype.hasOwnProperty.call(parsed, 'projects')) {
+            if (!Array.isArray(parsed.projects)) {
+              errors.push('projects must be an array.');
+            } else {
+              parsed.projects.forEach((project, projectIndex) => {
+                const projectPath = `projects[${projectIndex}]`;
+                if (!isPlainObject(project)) {
+                  errors.push(t('objectRequired', { path: projectPath }));
+                  return;
+                }
+
+                const projectTitle = firstString(project, ['project', 'title']);
+                const projectId = firstString(project, ['projectId']);
+                const projectTagsKey = project.tags !== undefined && project.tags !== null ? 'tags' : 'tagIds';
+                const projectTags = project[projectTagsKey];
+                const tasks = project.tasks;
+                if (!projectTitle && !projectId) {
+                  errors.push(`${projectPath}.title or ${projectPath}.projectId is required.`);
+                }
+                if (!Array.isArray(tasks)) {
+                  errors.push(`${projectPath}.tasks must be an array.`);
+                  return;
+                }
+
+                tasks.forEach((task, taskIndex) => {
+                  const taskPath = `${projectPath}.tasks[${taskIndex}]`;
+                  if (!isPlainObject(task)) {
+                    normalizeTask(task, taskPath, undefined, warnings, errors, missingProjects, missingTags, roots);
+                    return;
+                  }
+
+                  const inheritedTask = {
+                    ...task,
+                    ...((task.project === undefined || task.project === null) &&
+                    (task.projectId === undefined || task.projectId === null) &&
+                    projectTitle
+                      ? { project: projectTitle }
+                      : {}),
+                    ...((task.project === undefined || task.project === null) &&
+                    (task.projectId === undefined || task.projectId === null) &&
+                    !projectTitle && projectId
+                      ? { projectId }
+                      : {}),
+                    ...((task.tags === undefined || task.tags === null) &&
+                    (task.tagIds === undefined || task.tagIds === null) &&
+                    projectTags !== undefined && projectTags !== null
+                      ? { [projectTagsKey]: projectTags }
+                      : {})
+                  };
+                  normalizeTask(inheritedTask, taskPath, undefined, warnings, errors, missingProjects, missingTags, roots);
+                });
+              });
+            }
+          } else {
+            const list = asArray(parsed);
+            list.forEach((task, index) => {
+              normalizeTask(task, Array.isArray(parsed) ? `tasks[${index}]` : 'task', undefined, warnings, errors, missingProjects, missingTags, roots);
+            });
+          }
         } catch (error) {
           errors.push(t('invalidJson', { message: error.message }));
         }
@@ -1096,6 +1230,9 @@
         if (inputEl.value.trim()) validateInput();
         else render({ roots: [], warnings: [], errors: [], missingProjects: [], missingTags: [] });
       });
+
+      fieldsTabEl.addEventListener('click', () => selectHelpPanel('fields'));
+      multiTaskTabEl.addEventListener('click', () => selectHelpPanel('multi'));
 
       applyLanguage();
       render({ roots: [], warnings: [], errors: [], missingProjects: [], missingTags: [] });

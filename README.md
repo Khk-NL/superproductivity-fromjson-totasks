@@ -5,6 +5,7 @@
 ## 功能
 
 - 导入单个任务或任务数组
+- 支持按项目分组导入任务，并继承项目级默认标签
 - 支持一层子任务
 - 按名称匹配项目和标签，缺失时可确认创建
 - 导入前校验并预览
@@ -40,6 +41,38 @@
 - 常用别名：`name`/`summary` → `title`，`description`/`note`/`content` → `notes`，`date`/`dueDate` → `dueDay`，`children`/`subtasks` → `subTasks`
 
 项目和标签 ID 必须已存在；使用名称时，插件可以在确认后创建缺失项。子任务继承父任务的项目和标签，只支持一层嵌套。
+
+也可以按项目分组导入。项目级的 `title`、`project` 或 `projectId` 会作为任务默认项目，项目级 `tags` 或 `tagIds` 会作为任务默认标签；任务自身字段优先：
+
+```json
+{
+  "projects": [
+    {
+      "title": "考研",
+      "tags": ["学习"],
+      "tasks": [
+        {
+          "title": "复习链表",
+          "estimateMinutes": 60,
+          "subTasks": [
+            { "title": "数据结构" }
+          ]
+        },
+        {
+          "title": "复习二叉树",
+          "tags": ["重点"]
+        }
+      ]
+    },
+    {
+      "title": "课程",
+      "tasks": [
+        { "title": "完成计网作业" }
+      ]
+    }
+  ]
+}
+```
 
 ## 打包
 
