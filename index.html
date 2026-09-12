@@ -15,10 +15,12 @@
         color: var(--text-color);
         background: var(--bg);
         font-family: var(--font-primary-stack);
+        font-size: 1.1rem;
+        line-height: 1.5;
       }
 
       main {
-        max-width: 1080px;
+        max-width: 1240px;
         margin: 0 auto;
         display: grid;
         gap: var(--s3);
@@ -34,7 +36,7 @@
 
       h1 {
         margin: 0 0 var(--s-half);
-        font-size: 1.5rem;
+        font-size: 2.25rem;
         font-weight: 600;
       }
 
@@ -44,7 +46,7 @@
 
       .layout {
         display: grid;
-        grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+        grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
         gap: var(--s3);
         align-items: start;
       }
@@ -58,12 +60,20 @@
 
       textarea {
         width: 100%;
-        min-height: 420px;
+        min-height: 500px;
         resize: vertical;
         box-sizing: border-box;
+        padding: var(--s2);
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 0.9rem;
-        line-height: 1.45;
+        font-size: 1rem;
+        line-height: 1.55;
+      }
+
+      button,
+      select {
+        min-height: 44px;
+        padding: 8px 14px;
+        font: inherit;
       }
 
       .panel {
@@ -80,17 +90,17 @@
       .metric {
         border: 1px solid var(--divider-color);
         border-radius: 6px;
-        padding: var(--s);
+        padding: var(--s2);
         background: var(--card-bg);
       }
 
       .metric strong {
         display: block;
-        font-size: 1.35rem;
+        font-size: 1.6rem;
       }
 
       .preview {
-        max-height: 420px;
+        max-height: 500px;
         overflow: auto;
         border: 1px solid var(--divider-color);
         border-radius: 6px;
@@ -98,7 +108,7 @@
       }
 
       .preview-item {
-        padding: var(--s);
+        padding: var(--s2);
         border-bottom: 1px solid var(--divider-color);
       }
 
@@ -107,6 +117,7 @@
       }
 
       .preview-title {
+        font-size: 1.08rem;
         font-weight: 600;
         overflow-wrap: anywhere;
       }
@@ -120,9 +131,9 @@
 
       code,
       .pill {
-        font-size: 0.78rem;
+        font-size: 0.9rem;
         border-radius: 999px;
-        padding: 2px 7px;
+        padding: 4px 9px;
         background: var(--bg-darker);
       }
 
@@ -133,7 +144,7 @@
 
       .message {
         border-radius: 6px;
-        padding: var(--s);
+        padding: var(--s2);
         border: 1px solid var(--divider-color);
         overflow-wrap: anywhere;
       }
@@ -162,6 +173,7 @@
 
       summary {
         cursor: pointer;
+        font-size: 1.1rem;
         font-weight: 600;
       }
 
@@ -174,7 +186,7 @@
 
       .field-help {
         display: grid;
-        grid-template-columns: minmax(130px, 0.35fr) minmax(0, 1fr);
+        grid-template-columns: minmax(155px, 0.35fr) minmax(0, 1fr);
         gap: 1px;
         overflow: hidden;
         border: 1px solid var(--divider-color);
@@ -183,7 +195,7 @@
       }
 
       .field-help > div {
-        padding: var(--s);
+        padding: var(--s2);
         background: var(--card-bg);
       }
 
@@ -198,7 +210,7 @@
         }
 
         textarea {
-          min-height: 320px;
+          min-height: 380px;
         }
       }
     </style>
@@ -418,7 +430,7 @@
         document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
           el.placeholder = t(el.dataset.i18nPlaceholder);
         });
-        exampleJsonEl.textContent = JSON.stringify(sampleJson, null, 2);
+        exampleJsonEl.textContent = JSON.stringify(getSampleJson(), null, 2);
         fieldHelpEl.innerHTML = '';
         fieldDescriptions[currentLanguage].forEach(([field, description]) => {
           const fieldEl = document.createElement('div');
@@ -434,22 +446,44 @@
       let cachedProjects = [];
       let cachedTags = [];
 
-      const sampleJson = [
-        {
-          title: 'Prepare release notes',
-          notes: 'Mention the JSON import plugin.',
+      const sampleText = {
+        en: ['Prepare release notes', 'Mention the JSON import plugin.', 'Collect merged changes'],
+        'zh-CN': ['准备发布说明', '提及 JSON 导入插件。', '整理已合并的更改'],
+        ja: ['リリースノートを準備', 'JSON インポートプラグインについて記載する。', 'マージ済みの変更をまとめる'],
+        ko: ['릴리스 노트 준비', 'JSON 가져오기 플러그인을 언급합니다.', '병합된 변경 사항 정리'],
+        es: ['Preparar las notas de la versión', 'Mencionar el complemento de importación JSON.', 'Recopilar los cambios fusionados']
+      };
+
+      function getSampleJson() {
+        const [title, notes, subTaskTitle] = sampleText[currentLanguage];
+        return [{
+          title,
+          notes,
           estimateMinutes: 30,
           dueDay: '2026-08-07',
           isDone: false,
           tags: [],
-          subTasks: [
-            {
-              title: 'Collect merged changes',
-              estimateMinutes: 15
-            }
-          ]
+          subTasks: [{ title: subTaskTitle, estimateMinutes: 15 }]
+        }];
+      }
+
+      const previewLabels = {
+        en: { projectId: 'Project', tagIds: 'Tags', notes: 'Notes', timeEstimate: 'Estimate', parentId: 'Parent task', isDone: 'Status', dueDay: 'Due date', timeSpent: 'Time spent', remindAt: 'Reminder', dueWithTime: 'Due time', repeatCfgId: 'Repeat', issueId: 'Issue ID', issueProviderId: 'Issue provider', issuePoints: 'Issue points', done: 'Completed', open: 'Not completed', minutes: '{count} min' },
+        'zh-CN': { projectId: '项目', tagIds: '标签', notes: '备注', timeEstimate: '预计用时', parentId: '父任务', isDone: '状态', dueDay: '日期', timeSpent: '已用时间', remindAt: '提醒', dueWithTime: '截止时间', repeatCfgId: '重复设置', issueId: '问题 ID', issueProviderId: '问题来源', issuePoints: '问题点数', done: '已完成', open: '未完成', minutes: '{count} 分钟' },
+        ja: { projectId: 'プロジェクト', tagIds: 'タグ', notes: 'メモ', timeEstimate: '予定時間', parentId: '親タスク', isDone: '状態', dueDay: '期日', timeSpent: '経過時間', remindAt: '通知', dueWithTime: '締切時刻', repeatCfgId: '繰り返し', issueId: 'Issue ID', issueProviderId: 'Issue 提供元', issuePoints: 'Issue ポイント', done: '完了', open: '未完了', minutes: '{count} 分' },
+        ko: { projectId: '프로젝트', tagIds: '태그', notes: '메모', timeEstimate: '예상 시간', parentId: '상위 작업', isDone: '상태', dueDay: '예정일', timeSpent: '사용 시간', remindAt: '알림', dueWithTime: '마감 시간', repeatCfgId: '반복', issueId: '이슈 ID', issueProviderId: '이슈 제공자', issuePoints: '이슈 점수', done: '완료', open: '미완료', minutes: '{count}분' },
+        es: { projectId: 'Proyecto', tagIds: 'Etiquetas', notes: 'Notas', timeEstimate: 'Estimación', parentId: 'Tarea principal', isDone: 'Estado', dueDay: 'Fecha límite', timeSpent: 'Tiempo empleado', remindAt: 'Recordatorio', dueWithTime: 'Hora límite', repeatCfgId: 'Repetición', issueId: 'ID de incidencia', issueProviderId: 'Proveedor', issuePoints: 'Puntos', done: 'Completada', open: 'Pendiente', minutes: '{count} min' }
+      };
+
+      function formatPreviewValue(key, value) {
+        const labels = previewLabels[currentLanguage];
+        if (key === 'timeEstimate' || key === 'timeSpent') {
+          const minutes = Math.round(Number(value) / 60000);
+          return labels.minutes.replace('{count}', String(minutes));
         }
-      ];
+        if (key === 'isDone') return value ? labels.done : labels.open;
+        return Array.isArray(value) ? value.join(', ') : String(value);
+      }
 
       const optionalKeys = [
         'projectId',
@@ -901,11 +935,11 @@
             const valueSource = Object.prototype.hasOwnProperty.call(item.data, key)
               ? item.data
               : item.postCreateUpdates;
-            if (valueSource[key] !== undefined && valueSource[key] !== null) {
+            if (valueSource[key] !== undefined && valueSource[key] !== null && valueSource[key] !== '__PARENT__') {
               const pill = document.createElement('span');
               pill.className = 'pill';
-              const value = Array.isArray(valueSource[key]) ? valueSource[key].join(', ') : String(valueSource[key]);
-              pill.textContent = `${key}: ${value}`;
+              const label = previewLabels[currentLanguage][key] || key;
+              pill.textContent = `${label}: ${formatPreviewValue(key, valueSource[key])}`;
               meta.appendChild(pill);
             }
           });
@@ -1051,7 +1085,7 @@
         render({ roots: [], warnings: [], errors: [], missingProjects: [], missingTags: [] });
       });
       sampleBtn.addEventListener('click', () => {
-        inputEl.value = JSON.stringify(sampleJson, null, 2);
+        inputEl.value = JSON.stringify(getSampleJson(), null, 2);
         validateInput();
       });
 

@@ -1,7 +1,7 @@
 {
   "id": "json-to-tasks",
   "name": "JSON to Tasks",
-  "version": "1.3.0",
+  "version": "1.3.2",
   "description": "Create Super Productivity tasks from pasted JSON.",
   "manifestVersion": 1,
   "minSupVersion": "14.0.0",
