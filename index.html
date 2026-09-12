@@ -53,6 +53,7 @@
         display: flex;
         gap: var(--s);
         flex-wrap: wrap;
+        align-items: center;
       }
 
       textarea {
@@ -152,6 +153,40 @@
         flex-wrap: wrap;
       }
 
+      details {
+        border: 1px solid var(--divider-color);
+        border-radius: 6px;
+        padding: var(--s2);
+        background: var(--card-bg);
+      }
+
+      summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      pre {
+        overflow: auto;
+        padding: var(--s);
+        border-radius: 6px;
+        background: var(--bg-darker);
+      }
+
+      .field-help {
+        display: grid;
+        grid-template-columns: minmax(130px, 0.35fr) minmax(0, 1fr);
+        gap: 1px;
+        overflow: hidden;
+        border: 1px solid var(--divider-color);
+        border-radius: 6px;
+        background: var(--divider-color);
+      }
+
+      .field-help > div {
+        padding: var(--s);
+        background: var(--card-bg);
+      }
+
       @media (max-width: 820px) {
         body {
           padding: var(--s2);
@@ -172,12 +207,20 @@
     <main class="page-fade">
       <header>
         <div>
-          <h1>JSON to Tasks</h1>
-          <p class="text-muted">Paste JSON, validate it, then create tasks.</p>
+          <h1 data-i18n="title">JSON to Tasks</h1>
+          <p class="text-muted" data-i18n="subtitle">Paste JSON, validate it, then create tasks.</p>
         </div>
         <div class="toolbar">
-          <button id="sampleBtn" class="btn-outline" type="button">Sample</button>
-          <button id="clearBtn" type="button">Clear</button>
+          <label for="languageSelect" class="text-muted" data-i18n="language">Language</label>
+          <select id="languageSelect">
+            <option value="en">English</option>
+            <option value="zh-CN">中文</option>
+            <option value="ja">日本語</option>
+            <option value="ko">한국어</option>
+            <option value="es">Español</option>
+          </select>
+          <button id="sampleBtn" class="btn-outline" type="button" data-i18n="sample">Sample</button>
+          <button id="clearBtn" type="button" data-i18n="clear">Clear</button>
         </div>
       </header>
 
@@ -187,25 +230,26 @@
             id="jsonInput"
             spellcheck="false"
             placeholder='[{"title":"Write status update","notes":"Optional notes","estimateMinutes":25,"dueDay":"2026-08-07"}]'
+            data-i18n-placeholder="placeholder"
           ></textarea>
           <div class="actions">
-            <button id="validateBtn" type="button">Validate</button>
-            <button id="createBtn" class="btn-primary" type="button">Create Tasks</button>
+            <button id="validateBtn" type="button" data-i18n="validate">Validate</button>
+            <button id="createBtn" class="btn-primary" type="button" data-i18n="createTasks">Create Tasks</button>
           </div>
         </div>
 
         <aside class="panel">
           <div class="summary">
             <div class="metric">
-              <span class="text-muted">Tasks</span>
+              <span class="text-muted" data-i18n="tasks">Tasks</span>
               <strong id="taskCount">0</strong>
             </div>
             <div class="metric">
-              <span class="text-muted">Subtasks</span>
+              <span class="text-muted" data-i18n="subtasks">Subtasks</span>
               <strong id="subtaskCount">0</strong>
             </div>
             <div class="metric">
-              <span class="text-muted">Errors</span>
+              <span class="text-muted" data-i18n="errors">Errors</span>
               <strong id="errorCount">0</strong>
             </div>
           </div>
@@ -213,6 +257,13 @@
           <div id="preview" class="preview"></div>
         </aside>
       </section>
+
+      <details>
+        <summary data-i18n="helpTitle">JSON example and field reference</summary>
+        <p class="text-muted" data-i18n="helpIntro">Paste one task object or an array of task objects. Only title is required.</p>
+        <pre><code id="exampleJson"></code></pre>
+        <div id="fieldHelp" class="field-help"></div>
+      </details>
     </main>
 
     <script>
@@ -226,6 +277,159 @@
       const createBtn = document.getElementById('createBtn');
       const clearBtn = document.getElementById('clearBtn');
       const sampleBtn = document.getElementById('sampleBtn');
+      const languageSelect = document.getElementById('languageSelect');
+      const exampleJsonEl = document.getElementById('exampleJson');
+      const fieldHelpEl = document.getElementById('fieldHelp');
+
+      const translations = {
+        en: {
+          title: 'JSON to Tasks', subtitle: 'Paste JSON, validate it, then create tasks.', language: 'Language',
+          sample: 'Sample', clear: 'Clear', validate: 'Validate', createTasks: 'Create Tasks',
+          tasks: 'Tasks', subtasks: 'Subtasks', errors: 'Errors',
+          placeholder: '[{"title":"Write status update","notes":"Optional notes","estimateMinutes":25,"dueDay":"2026-08-07"}]',
+          emptyInput: 'JSON input is empty.', invalidJson: 'Invalid JSON: {message}', noValidTasks: 'No valid tasks yet.',
+          moreTasks: '{count} more task(s) hidden from preview.', fixErrors: 'Fix JSON errors before creating tasks.',
+          importCancelled: 'Import cancelled. Missing projects or tags were not created.', noTasks: 'No tasks to create.',
+          createdTasks: 'Created {count} task{suffix}.', failedCreate: 'Failed to create tasks: {message}{leftovers}',
+          createEntitiesTitle: 'Create missing projects and tags?', projectsLabel: 'Projects:', tagsLabel: 'Tags:',
+          cancel: 'Cancel', create: 'Create', createTasksTitle: 'Create tasks?', createCount: 'This will create <strong>{count}</strong> tasks.',
+          createdEntitiesUnresolved: 'Created {projects} project(s) and {tags} tag(s), but validation still has unresolved entries.',
+          leftovers: ' Created {projects} project(s) and {tags} tag(s) before the failure; they may remain.',
+          helpTitle: 'JSON example and field reference', helpIntro: 'Paste one task object or an array of task objects. Only title is required.',
+          required: 'Required', optional: 'Optional', aliases: 'Aliases', inherited: 'Ignored on subtasks because they inherit these values from the parent task.',
+          objectRequired: '{path} must be an object.', tooDeep: '{path} is nested too deeply. Super Productivity supports root tasks and one subtask level only.',
+          titleRequired: '{path}.title is required and must be a non-empty string.', invalidDueDay: '{path}.dueDay must be YYYY-MM-DD or another parseable date string.',
+          invalidField: '{path}.{field} must be {type} and was ignored.', ignoredFields: '{path} ignored unsupported field(s): {fields}.',
+          subTasksArray: '{path}.subTasks must be an array when provided.', nestedSubTasks: '{path}.subTasks is not supported. Super Productivity supports root tasks and one subtask level only.',
+          subProjectIgnored: '{path}.project/projectId was ignored because subtasks inherit their parent project.', subTagsIgnored: '{path}.tags/tagIds was ignored because subtasks inherit parent tags in Super Productivity.',
+          missingProject: 'Project "{title}" does not exist. It can be created before importing.', missingTag: 'Tag "{title}" does not exist. It can be created before importing.'
+        },
+        'zh-CN': {
+          title: 'JSON 转任务', subtitle: '粘贴 JSON，校验后创建任务。', language: '语言',
+          sample: '示例', clear: '清空', validate: '校验', createTasks: '创建任务',
+          tasks: '任务', subtasks: '子任务', errors: '错误',
+          placeholder: '[{"title":"编写状态更新","notes":"可选备注","estimateMinutes":25,"dueDay":"2026-08-07"}]',
+          emptyInput: 'JSON 输入为空。', invalidJson: 'JSON 无效：{message}', noValidTasks: '暂无有效任务。',
+          moreTasks: '还有 {count} 个任务未在预览中显示。', fixErrors: '请先修正 JSON 错误再创建任务。',
+          importCancelled: '已取消导入，未创建缺失的项目或标签。', noTasks: '没有可创建的任务。',
+          createdTasks: '已创建 {count} 个任务。', failedCreate: '创建任务失败：{message}{leftovers}',
+          createEntitiesTitle: '创建缺失的项目和标签？', projectsLabel: '项目：', tagsLabel: '标签：',
+          cancel: '取消', create: '创建', createTasksTitle: '创建任务？', createCount: '即将创建 <strong>{count}</strong> 个任务。',
+          createdEntitiesUnresolved: '已创建 {projects} 个项目和 {tags} 个标签，但校验后仍有未解析的条目。',
+          leftovers: ' 失败前已创建 {projects} 个项目和 {tags} 个标签；它们可能会保留。',
+          helpTitle: 'JSON 示例与字段说明', helpIntro: '可以粘贴单个任务对象或任务对象数组，只有 title 是必填字段。',
+          required: '必填', optional: '可选', aliases: '别名', inherited: '子任务会继承父任务的这些值，因此子任务中的该字段会被忽略。',
+          objectRequired: '{path} 必须是对象。', tooDeep: '{path} 嵌套过深；Super Productivity 只支持根任务和一层子任务。',
+          titleRequired: '{path}.title 为必填项，且必须是非空字符串。', invalidDueDay: '{path}.dueDay 必须是 YYYY-MM-DD 或其他可解析的日期字符串。',
+          invalidField: '{path}.{field} 必须是{type}，该字段已忽略。', ignoredFields: '{path} 中不支持的字段已忽略：{fields}。',
+          subTasksArray: '{path}.subTasks 必须是数组。', nestedSubTasks: '{path}.subTasks 不受支持；Super Productivity 只支持一层子任务。',
+          subProjectIgnored: '{path}.project/projectId 已忽略，因为子任务继承父任务的项目。', subTagsIgnored: '{path}.tags/tagIds 已忽略，因为子任务继承父任务的标签。',
+          missingProject: '项目“{title}”不存在，可在导入前创建。', missingTag: '标签“{title}”不存在，可在导入前创建。'
+        },
+        ja: {
+          title: 'JSON からタスクへ', subtitle: 'JSON を貼り付け、検証してからタスクを作成します。', language: '言語', sample: 'サンプル', clear: 'クリア', validate: '検証', createTasks: 'タスクを作成', tasks: 'タスク', subtasks: 'サブタスク', errors: 'エラー', placeholder: '[{"title":"進捗報告を書く","notes":"任意のメモ","estimateMinutes":25,"dueDay":"2026-08-07"}]',
+          emptyInput: 'JSON が入力されていません。', invalidJson: 'JSON が無効です：{message}', noValidTasks: '有効なタスクはありません。', moreTasks: 'ほか {count} 件はプレビューに表示されていません。', fixErrors: 'タスクを作成する前に JSON のエラーを修正してください。', importCancelled: 'インポートをキャンセルしました。存在しないプロジェクトやタグは作成されませんでした。', noTasks: '作成するタスクがありません。', createdTasks: '{count} 件のタスクを作成しました。', failedCreate: 'タスクの作成に失敗しました：{message}{leftovers}', createEntitiesTitle: '存在しないプロジェクトとタグを作成しますか？', projectsLabel: 'プロジェクト：', tagsLabel: 'タグ：', cancel: 'キャンセル', create: '作成', createTasksTitle: 'タスクを作成しますか？', createCount: '<strong>{count}</strong> 件のタスクを作成します。', createdEntitiesUnresolved: 'プロジェクト {projects} 件とタグ {tags} 件を作成しましたが、未解決の項目があります。', leftovers: ' 失敗前にプロジェクト {projects} 件とタグ {tags} 件が作成され、残っている可能性があります。', helpTitle: 'JSON サンプルとフィールド説明', helpIntro: '1 件のタスクオブジェクトまたは配列を貼り付けられます。必須なのは title だけです。', required: '必須', optional: '任意', aliases: '別名', inherited: 'サブタスクは親の値を継承するため無視されます。', objectRequired: '{path} はオブジェクトである必要があります。', tooDeep: '{path} のネストが深すぎます。サブタスクは 1 階層のみ対応しています。', titleRequired: '{path}.title は必須の空でない文字列です。', invalidDueDay: '{path}.dueDay は YYYY-MM-DD または解析可能な日付である必要があります。', invalidField: '{path}.{field} は{type}である必要があるため無視されました。', ignoredFields: '{path} の未対応フィールドを無視しました：{fields}。', subTasksArray: '{path}.subTasks は配列である必要があります。', nestedSubTasks: '{path}.subTasks は未対応です。サブタスクは 1 階層のみ対応しています。', subProjectIgnored: '{path}.project/projectId は親タスクから継承されるため無視されました。', subTagsIgnored: '{path}.tags/tagIds は親タスクから継承されるため無視されました。', missingProject: 'プロジェクト「{title}」は存在しません。インポート前に作成できます。', missingTag: 'タグ「{title}」は存在しません。インポート前に作成できます。'
+        },
+        ko: {
+          title: 'JSON을 작업으로', subtitle: 'JSON을 붙여넣고 검증한 후 작업을 만듭니다.', language: '언어', sample: '예시', clear: '지우기', validate: '검증', createTasks: '작업 만들기', tasks: '작업', subtasks: '하위 작업', errors: '오류', placeholder: '[{"title":"상태 업데이트 작성","notes":"선택 메모","estimateMinutes":25,"dueDay":"2026-08-07"}]',
+          emptyInput: 'JSON 입력이 비어 있습니다.', invalidJson: '잘못된 JSON: {message}', noValidTasks: '유효한 작업이 없습니다.', moreTasks: '작업 {count}개가 미리보기에서 숨겨졌습니다.', fixErrors: '작업을 만들기 전에 JSON 오류를 수정하세요.', importCancelled: '가져오기를 취소했습니다. 누락된 프로젝트나 태그를 만들지 않았습니다.', noTasks: '만들 작업이 없습니다.', createdTasks: '작업 {count}개를 만들었습니다.', failedCreate: '작업 만들기 실패: {message}{leftovers}', createEntitiesTitle: '누락된 프로젝트와 태그를 만들까요?', projectsLabel: '프로젝트:', tagsLabel: '태그:', cancel: '취소', create: '만들기', createTasksTitle: '작업을 만들까요?', createCount: '작업 <strong>{count}</strong>개를 만듭니다.', createdEntitiesUnresolved: '프로젝트 {projects}개와 태그 {tags}개를 만들었지만 해결되지 않은 항목이 있습니다.', leftovers: ' 실패 전에 프로젝트 {projects}개와 태그 {tags}개가 만들어져 남아 있을 수 있습니다.', helpTitle: 'JSON 예시 및 필드 설명', helpIntro: '작업 객체 하나 또는 작업 객체 배열을 붙여넣을 수 있습니다. title만 필수입니다.', required: '필수', optional: '선택', aliases: '별칭', inherited: '하위 작업은 상위 작업의 값을 상속하므로 무시됩니다.', objectRequired: '{path}은(는) 객체여야 합니다.', tooDeep: '{path}의 중첩이 너무 깊습니다. 하위 작업은 한 단계만 지원합니다.', titleRequired: '{path}.title은(는) 비어 있지 않은 필수 문자열입니다.', invalidDueDay: '{path}.dueDay는 YYYY-MM-DD 또는 해석 가능한 날짜여야 합니다.', invalidField: '{path}.{field}은(는) {type}이어야 하므로 무시되었습니다.', ignoredFields: '{path}에서 지원하지 않는 필드를 무시했습니다: {fields}.', subTasksArray: '{path}.subTasks는 배열이어야 합니다.', nestedSubTasks: '{path}.subTasks는 지원되지 않습니다. 하위 작업은 한 단계만 지원합니다.', subProjectIgnored: '{path}.project/projectId는 상위 작업에서 상속되므로 무시되었습니다.', subTagsIgnored: '{path}.tags/tagIds는 상위 작업에서 상속되므로 무시되었습니다.', missingProject: '프로젝트 "{title}"이(가) 없습니다. 가져오기 전에 만들 수 있습니다.', missingTag: '태그 "{title}"이(가) 없습니다. 가져오기 전에 만들 수 있습니다.'
+        },
+        es: {
+          title: 'JSON a tareas', subtitle: 'Pega JSON, valídalo y crea las tareas.', language: 'Idioma', sample: 'Ejemplo', clear: 'Limpiar', validate: 'Validar', createTasks: 'Crear tareas', tasks: 'Tareas', subtasks: 'Subtareas', errors: 'Errores', placeholder: '[{"title":"Escribir actualización","notes":"Notas opcionales","estimateMinutes":25,"dueDay":"2026-08-07"}]',
+          emptyInput: 'La entrada JSON está vacía.', invalidJson: 'JSON no válido: {message}', noValidTasks: 'Todavía no hay tareas válidas.', moreTasks: 'Hay {count} tarea(s) más ocultas en la vista previa.', fixErrors: 'Corrige los errores del JSON antes de crear tareas.', importCancelled: 'Importación cancelada. No se crearon los proyectos o etiquetas que faltaban.', noTasks: 'No hay tareas que crear.', createdTasks: 'Se crearon {count} tarea(s).', failedCreate: 'No se pudieron crear las tareas: {message}{leftovers}', createEntitiesTitle: '¿Crear los proyectos y etiquetas que faltan?', projectsLabel: 'Proyectos:', tagsLabel: 'Etiquetas:', cancel: 'Cancelar', create: 'Crear', createTasksTitle: '¿Crear tareas?', createCount: 'Se crearán <strong>{count}</strong> tareas.', createdEntitiesUnresolved: 'Se crearon {projects} proyecto(s) y {tags} etiqueta(s), pero aún hay elementos sin resolver.', leftovers: ' Antes del error se crearon {projects} proyecto(s) y {tags} etiqueta(s); es posible que permanezcan.', helpTitle: 'Ejemplo JSON y referencia de campos', helpIntro: 'Pega un objeto de tarea o una matriz de objetos. Solo title es obligatorio.', required: 'Obligatorio', optional: 'Opcional', aliases: 'Alias', inherited: 'Se ignora en subtareas porque heredan estos valores de la tarea principal.', objectRequired: '{path} debe ser un objeto.', tooDeep: '{path} está demasiado anidado. Solo se admite un nivel de subtareas.', titleRequired: '{path}.title es obligatorio y debe ser una cadena no vacía.', invalidDueDay: '{path}.dueDay debe tener el formato YYYY-MM-DD o ser una fecha válida.', invalidField: '{path}.{field} debe ser {type} y se ignoró.', ignoredFields: 'Se ignoraron campos no compatibles en {path}: {fields}.', subTasksArray: '{path}.subTasks debe ser una matriz.', nestedSubTasks: '{path}.subTasks no es compatible. Solo se admite un nivel de subtareas.', subProjectIgnored: 'Se ignoró {path}.project/projectId porque las subtareas heredan el proyecto principal.', subTagsIgnored: 'Se ignoró {path}.tags/tagIds porque las subtareas heredan las etiquetas principales.', missingProject: 'El proyecto «{title}» no existe. Puede crearse antes de importar.', missingTag: 'La etiqueta «{title}» no existe. Puede crearse antes de importar.'
+        }
+      };
+
+      const fieldDescriptions = {
+        en: [
+          ['title', 'Required. Non-empty task title. Aliases: name, summary.'],
+          ['project / projectId', 'Existing project title / existing project ID. Missing titles can be created after confirmation.'],
+          ['tags / tagIds', 'Existing tag titles / existing tag IDs. A single value or array is accepted.'],
+          ['notes', 'Task notes. Aliases: description, note, content.'],
+          ['timeEstimate', 'Estimated duration in milliseconds. Aliases: estimateMs; estimateMinutes, estimateMin, and minutes are converted from minutes.'],
+          ['isDone', 'Completion state. Aliases: done, completed. Boolean-like strings are accepted.'],
+          ['dueDay', 'Scheduled day, preferably YYYY-MM-DD. Aliases: dueDate, date.'],
+          ['parentId', 'Existing parent task ID. Super Productivity supports only one subtask level.'],
+          ['subTasks', 'Array of child tasks. Aliases: subtasks, children. Only one nested level is supported.'],
+          ['post-create fields', 'timeSpent, timeSpentOnDay, doneOn, attachments, remindAt, dueWithTime, repeatCfgId, and issue-related fields are applied with updateTask after creation.'],
+          ['subtask project/tags', 'Ignored because subtasks inherit their parent project and tags.']
+        ],
+        'zh-CN': [
+          ['title', '必填，非空任务标题。别名：name、summary。'],
+          ['project / projectId', '现有项目名称 / 现有项目 ID。名称不存在时，可在确认后创建项目。'],
+          ['tags / tagIds', '现有标签名称 / 现有标签 ID。可以传单个值或数组。'],
+          ['notes', '任务备注。别名：description、note、content。'],
+          ['timeEstimate', '预计用时，单位为毫秒。estimateMs 同义；estimateMinutes、estimateMin、minutes 按分钟换算。'],
+          ['isDone', '是否完成。别名：done、completed，也支持可识别的布尔字符串。'],
+          ['dueDay', '计划日期，建议使用 YYYY-MM-DD。别名：dueDate、date。'],
+          ['parentId', '现有父任务 ID。Super Productivity 只支持一层子任务。'],
+          ['subTasks', '子任务数组。别名：subtasks、children；只支持一层嵌套。'],
+          ['创建后更新字段', 'timeSpent、timeSpentOnDay、doneOn、attachments、remindAt、dueWithTime、repeatCfgId 及 issue 相关字段会在创建后通过 updateTask 写入。'],
+          ['子任务的项目/标签', '子任务继承父任务的项目和标签，因此这些字段会被忽略。']
+        ],
+        ja: [
+          ['title', '必須。空でないタスク名。別名：name、summary。'], ['project / projectId', '既存プロジェクトの名前 / ID。存在しない名前は確認後に作成できます。'],
+          ['tags / tagIds', '既存タグの名前 / ID。単一値または配列を指定できます。'], ['notes', 'タスクのメモ。別名：description、note、content。'],
+          ['timeEstimate', '予定時間（ミリ秒）。estimateMinutes、estimateMin、minutes は分から変換されます。'], ['isDone', '完了状態。別名：done、completed。'],
+          ['dueDay', '予定日。YYYY-MM-DD 推奨。別名：dueDate、date。'], ['parentId', '既存の親タスク ID。サブタスクは 1 階層のみ対応。'],
+          ['subTasks', '子タスクの配列。別名：subtasks、children。'], ['作成後の更新フィールド', '時間、通知、添付、繰り返し、issue 関連フィールドは作成後に updateTask で設定されます。'],
+          ['サブタスクのプロジェクト/タグ', '親タスクから継承されるため無視されます。']
+        ],
+        ko: [
+          ['title', '필수. 비어 있지 않은 작업 제목. 별칭: name, summary.'], ['project / projectId', '기존 프로젝트 이름 / ID. 없는 이름은 확인 후 만들 수 있습니다.'],
+          ['tags / tagIds', '기존 태그 이름 / ID. 단일 값 또는 배열을 사용할 수 있습니다.'], ['notes', '작업 메모. 별칭: description, note, content.'],
+          ['timeEstimate', '예상 시간(밀리초). estimateMinutes, estimateMin, minutes는 분 단위로 변환됩니다.'], ['isDone', '완료 상태. 별칭: done, completed.'],
+          ['dueDay', '예정일. YYYY-MM-DD 권장. 별칭: dueDate, date.'], ['parentId', '기존 상위 작업 ID. 하위 작업은 한 단계만 지원합니다.'],
+          ['subTasks', '하위 작업 배열. 별칭: subtasks, children.'], ['생성 후 업데이트 필드', '시간, 알림, 첨부, 반복 및 issue 관련 필드는 생성 후 updateTask로 적용됩니다.'],
+          ['하위 작업 프로젝트/태그', '상위 작업에서 상속되므로 무시됩니다.']
+        ],
+        es: [
+          ['title', 'Obligatorio. Título no vacío. Alias: name, summary.'], ['project / projectId', 'Nombre / ID de un proyecto existente. Los nombres ausentes pueden crearse tras confirmación.'],
+          ['tags / tagIds', 'Nombres / ID de etiquetas existentes. Acepta un valor o una matriz.'], ['notes', 'Notas de la tarea. Alias: description, note, content.'],
+          ['timeEstimate', 'Duración estimada en milisegundos. estimateMinutes, estimateMin y minutes se convierten desde minutos.'], ['isDone', 'Estado de finalización. Alias: done, completed.'],
+          ['dueDay', 'Fecha prevista, preferiblemente YYYY-MM-DD. Alias: dueDate, date.'], ['parentId', 'ID de la tarea principal. Solo se admite un nivel de subtareas.'],
+          ['subTasks', 'Matriz de subtareas. Alias: subtasks, children.'], ['campos posteriores', 'Tiempo, avisos, adjuntos, repetición y campos de issue se aplican con updateTask tras crear la tarea.'],
+          ['proyecto/etiquetas de subtarea', 'Se ignoran porque se heredan de la tarea principal.']
+        ]
+      };
+
+      const supportedLanguages = ['en', 'zh-CN', 'ja', 'ko', 'es'];
+      const savedLanguage = localStorage.getItem('json-to-tasks-language');
+      const browserLanguage = navigator.language.toLowerCase();
+      let currentLanguage = supportedLanguages.includes(savedLanguage)
+        ? savedLanguage
+        : browserLanguage.startsWith('zh') ? 'zh-CN'
+          : supportedLanguages.find((language) => browserLanguage.startsWith(language)) || 'en';
+
+      function t(key, values = {}) {
+        let text = translations[currentLanguage][key] || translations.en[key] || key;
+        Object.entries(values).forEach(([name, value]) => {
+          text = text.replaceAll(`{${name}}`, String(value));
+        });
+        return text;
+      }
+
+      function applyLanguage() {
+        document.documentElement.lang = currentLanguage;
+        languageSelect.value = currentLanguage;
+        document.querySelectorAll('[data-i18n]').forEach((el) => {
+          el.textContent = t(el.dataset.i18n);
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+          el.placeholder = t(el.dataset.i18nPlaceholder);
+        });
+        exampleJsonEl.textContent = JSON.stringify(sampleJson, null, 2);
+        fieldHelpEl.innerHTML = '';
+        fieldDescriptions[currentLanguage].forEach(([field, description]) => {
+          const fieldEl = document.createElement('div');
+          const descriptionEl = document.createElement('div');
+          const codeEl = document.createElement('code');
+          codeEl.textContent = field;
+          fieldEl.appendChild(codeEl);
+          descriptionEl.textContent = description;
+          fieldHelpEl.append(fieldEl, descriptionEl);
+        });
+      }
 
       let cachedProjects = [];
       let cachedTags = [];
@@ -450,7 +654,7 @@
             if (numberValue !== undefined) {
               updates[key] = Math.round(numberValue);
             } else {
-              warnings.push(`${path}.${key} must be a number and was ignored.`);
+              warnings.push(t('invalidField', { path, field: key, type: currentLanguage === 'zh-CN' ? '数字' : 'a number' }));
             }
             return;
           }
@@ -459,7 +663,7 @@
             if (boolValue !== undefined) {
               updates[key] = boolValue;
             } else {
-              warnings.push(`${path}.${key} must be a boolean and was ignored.`);
+              warnings.push(t('invalidField', { path, field: key, type: currentLanguage === 'zh-CN' ? '布尔值' : 'a boolean' }));
             }
             return;
           }
@@ -467,7 +671,7 @@
             if (typeof value === 'string') {
               updates[key] = value;
             } else {
-              warnings.push(`${path}.${key} must be a string or null and was ignored.`);
+              warnings.push(t('invalidField', { path, field: key, type: currentLanguage === 'zh-CN' ? '字符串或 null' : 'a string or null' }));
             }
             return;
           }
@@ -475,7 +679,7 @@
             if (Array.isArray(value)) {
               updates[key] = value;
             } else {
-              warnings.push(`${path}.${key} must be an array and was ignored.`);
+              warnings.push(t('invalidField', { path, field: key, type: currentLanguage === 'zh-CN' ? '数组' : 'an array' }));
             }
             return;
           }
@@ -483,7 +687,7 @@
             if (isPlainObject(value)) {
               updates[key] = value;
             } else {
-              warnings.push(`${path}.${key} must be an object and was ignored.`);
+              warnings.push(t('invalidField', { path, field: key, type: currentLanguage === 'zh-CN' ? '对象' : 'an object' }));
             }
           }
         });
@@ -492,17 +696,17 @@
 
       function normalizeTask(source, path, parentId, warnings, errors, missingProjects, missingTags, normalized, depth = 0) {
         if (!isPlainObject(source)) {
-          errors.push(`${path} must be an object.`);
+          errors.push(t('objectRequired', { path }));
           return;
         }
         if (depth > 1) {
-          errors.push(`${path} is nested too deeply. Super Productivity supports root tasks and one subtask level only.`);
+          errors.push(t('tooDeep', { path }));
           return;
         }
 
         const title = firstString(source, ['title', 'name', 'summary']);
         if (!title) {
-          errors.push(`${path}.title is required and must be a non-empty string.`);
+          errors.push(t('titleRequired', { path }));
           return;
         }
 
@@ -517,12 +721,12 @@
         let projectId;
         let tagIds;
         if (isSubTask && (source.project !== undefined || source.projectId !== undefined)) {
-          warnings.push(`${path}.project/projectId was ignored because subtasks inherit their parent project.`);
+          warnings.push(t('subProjectIgnored', { path }));
         } else {
           projectId = resolveProjectId(source, errors, missingProjects, path);
         }
         if (isSubTask && (source.tags !== undefined || source.tagIds !== undefined)) {
-          warnings.push(`${path}.tags/tagIds was ignored because subtasks inherit parent tags in Super Productivity.`);
+          warnings.push(t('subTagsIgnored', { path }));
         } else {
           tagIds = tagIdsFrom(source, warnings, errors, missingTags, path);
         }
@@ -536,7 +740,7 @@
         if (isDone !== undefined) data.isDone = isDone;
         if (dueDay !== undefined) data.dueDay = dueDay;
         if (hasDueInput && dueDay === undefined) {
-          errors.push(`${path}.dueDay must be YYYY-MM-DD or another parseable date string.`);
+          errors.push(t('invalidDueDay', { path }));
         }
         if (projectId !== undefined) data.projectId = projectId;
         if (tagIds !== undefined) data.tagIds = tagIds;
@@ -575,7 +779,7 @@
           ].includes(key) && !Object.prototype.hasOwnProperty.call(postCreateFieldTypes, key);
         });
         if (ignored.length) {
-          warnings.push(`${path} ignored unsupported field(s): ${ignored.join(', ')}.`);
+          warnings.push(t('ignoredFields', { path, fields: ignored.join(', ') }));
         }
 
         const children = source.subTasks ?? source.subtasks ?? source.children;
@@ -584,9 +788,9 @@
 
         if (children !== undefined) {
           if (!Array.isArray(children)) {
-            errors.push(`${path}.subTasks must be an array when provided.`);
+            errors.push(t('subTasksArray', { path }));
           } else if ((depth >= 1 || directParentId !== undefined) && children.length) {
-            errors.push(`${path}.subTasks is not supported. Super Productivity supports root tasks and one subtask level only.`);
+            errors.push(t('nestedSubTasks', { path }));
           } else {
             item.children = children.map((child, index) => {
               const childItems = [];
@@ -629,7 +833,7 @@
         const raw = inputEl.value.trim();
 
         if (!raw) {
-          errors.push('JSON input is empty.');
+          errors.push(t('emptyInput'));
           render({ roots, warnings, errors, missingProjects, missingTags });
           return { roots, warnings, errors, missingProjects, missingTags };
         }
@@ -641,14 +845,14 @@
             normalizeTask(task, Array.isArray(parsed) ? `tasks[${index}]` : 'task', undefined, warnings, errors, missingProjects, missingTags, roots);
           });
         } catch (error) {
-          errors.push(`Invalid JSON: ${error.message}`);
+          errors.push(t('invalidJson', { message: error.message }));
         }
 
         missingProjects.forEach((title) => {
-          warnings.push(`Project "${title}" does not exist. It can be created before importing.`);
+          warnings.push(t('missingProject', { title }));
         });
         missingTags.forEach((title) => {
-          warnings.push(`Tag "${title}" does not exist. It can be created before importing.`);
+          warnings.push(t('missingTag', { title }));
         });
 
         render({ roots, warnings, errors, missingProjects, missingTags });
@@ -676,7 +880,7 @@
         if (!flat.length) {
           const empty = document.createElement('div');
           empty.className = 'preview-item text-muted';
-          empty.textContent = 'No valid tasks yet.';
+          empty.textContent = t('noValidTasks');
           previewEl.appendChild(empty);
           return;
         }
@@ -712,7 +916,7 @@
         if (flat.length > 100) {
           const more = document.createElement('div');
           more.className = 'preview-item text-muted';
-          more.textContent = `${flat.length - 100} more task(s) hidden from preview.`;
+          more.textContent = t('moreTasks', { count: flat.length - 100 });
           previewEl.appendChild(more);
         }
       }
@@ -757,21 +961,21 @@
 
         const parts = [];
         if (result.missingProjects.length) {
-          parts.push(`<p><strong>Projects:</strong> ${result.missingProjects.map(escapeHtml).join(', ')}</p>`);
+          parts.push(`<p><strong>${t('projectsLabel')}</strong> ${result.missingProjects.map(escapeHtml).join(', ')}</p>`);
         }
         if (result.missingTags.length) {
-          parts.push(`<p><strong>Tags:</strong> ${result.missingTags.map(escapeHtml).join(', ')}</p>`);
+          parts.push(`<p><strong>${t('tagsLabel')}</strong> ${result.missingTags.map(escapeHtml).join(', ')}</p>`);
         }
 
         const answer = await PluginAPI.openDialog({
-          title: 'Create missing projects and tags?',
+          title: t('createEntitiesTitle'),
           htmlContent: parts.join(''),
           buttons: [
-            { label: 'Cancel' },
-            { label: 'Create', color: 'primary', raised: true }
+            { label: t('cancel') },
+            { label: t('create'), color: 'primary', raised: true }
           ]
         });
-        if (answer !== 'Create') return false;
+        if (answer !== t('create')) return false;
 
         for (const title of result.missingProjects) {
           await PluginAPI.addProject({ title });
@@ -790,51 +994,51 @@
         try {
           let result = await validateInput();
           if (result.errors.length) {
-            PluginAPI.showSnack({ msg: 'Fix JSON errors before creating tasks.', type: 'ERROR' });
+            PluginAPI.showSnack({ msg: t('fixErrors'), type: 'ERROR' });
             return;
           }
 
           if (result.missingProjects.length || result.missingTags.length) {
             const createdEntities = await createMissingEntities(result, stats);
             if (!createdEntities) {
-              PluginAPI.showSnack({ msg: 'Import cancelled. Missing projects or tags were not created.', type: 'INFO' });
+              PluginAPI.showSnack({ msg: t('importCancelled'), type: 'INFO' });
               return;
             }
             result = await validateInput();
             if (result.errors.length || result.missingProjects.length || result.missingTags.length) {
-              PluginAPI.showSnack({ msg: `Created ${stats.projectsCreated} project(s) and ${stats.tagsCreated} tag(s), but validation still has unresolved entries.`, type: 'ERROR' });
+              PluginAPI.showSnack({ msg: t('createdEntitiesUnresolved', { projects: stats.projectsCreated, tags: stats.tagsCreated }), type: 'ERROR' });
               return;
             }
           }
 
           const flat = flattenPreview(result.roots);
           if (!flat.length) {
-            PluginAPI.showSnack({ msg: 'No tasks to create.', type: 'WARNING' });
+            PluginAPI.showSnack({ msg: t('noTasks'), type: 'WARNING' });
             return;
           }
 
           if (flat.length > 20 && PluginAPI.openDialog) {
             const answer = await PluginAPI.openDialog({
-              title: 'Create tasks?',
-              htmlContent: `<p>This will create <strong>${flat.length}</strong> tasks.</p>`,
+              title: t('createTasksTitle'),
+              htmlContent: `<p>${t('createCount', { count: flat.length })}</p>`,
               buttons: [
-                { label: 'Cancel' },
-                { label: 'Create', color: 'primary', raised: true }
+                { label: t('cancel') },
+                { label: t('create'), color: 'primary', raised: true }
               ]
             });
-            if (answer !== 'Create') return;
+            if (answer !== t('create')) return;
           }
 
           await createTree(result.roots, undefined, stats);
           PluginAPI.showSnack({
-            msg: `Created ${stats.tasksCreated} task${stats.tasksCreated === 1 ? '' : 's'}.`,
+            msg: t('createdTasks', { count: stats.tasksCreated, suffix: stats.tasksCreated === 1 ? '' : 's' }),
             type: 'SUCCESS'
           });
         } catch (error) {
           const leftovers = stats.projectsCreated || stats.tagsCreated
-            ? ` Created ${stats.projectsCreated} project(s) and ${stats.tagsCreated} tag(s) before the failure; they may remain.`
+            ? t('leftovers', { projects: stats.projectsCreated, tags: stats.tagsCreated })
             : '';
-          PluginAPI.showSnack({ msg: `Failed to create tasks: ${error.message}${leftovers}`, type: 'ERROR' });
+          PluginAPI.showSnack({ msg: t('failedCreate', { message: error.message, leftovers }), type: 'ERROR' });
         } finally {
           createBtn.disabled = false;
         }
@@ -851,6 +1055,15 @@
         validateInput();
       });
 
+      languageSelect.addEventListener('change', () => {
+        currentLanguage = languageSelect.value;
+        localStorage.setItem('json-to-tasks-language', currentLanguage);
+        applyLanguage();
+        if (inputEl.value.trim()) validateInput();
+        else render({ roots: [], warnings: [], errors: [], missingProjects: [], missingTags: [] });
+      });
+
+      applyLanguage();
       render({ roots: [], warnings: [], errors: [], missingProjects: [], missingTags: [] });
     </script>
   </body>

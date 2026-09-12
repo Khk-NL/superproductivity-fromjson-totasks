@@ -1,77 +1,46 @@
 # JSON to Tasks
 
-Super Productivity plugin for creating tasks from pasted JSON.
+将 JSON 批量导入为 Super Productivity 任务和子任务。
 
-## Supported Input
+## 功能
 
-Paste either one task object or an array of task objects.
+- 导入单个任务或任务数组
+- 支持一层子任务
+- 按名称匹配项目和标签，缺失时可确认创建
+- 导入前校验并预览
+- 支持中文、English、日本語、한국어、Español
+- 内置 JSON 示例和字段说明
 
-```json
-{
-  "title": "Draft customer onboarding checklist",
-  "project": "Client Launch",
-  "tags": ["Writing", "High Priority"],
-  "estimateMinutes": 45,
-  "dueDay": "2026-08-07",
-  "notes": "Definition of done: first draft is ready for review."
-}
-```
+## 安装
+
+在 Super Productivity 的插件设置中上传 `json-to-tasks.zip`。
+
+## 示例
 
 ```json
 [
   {
-    "title": "Prepare release notes",
-    "project": "Product Ops",
-    "tags": ["Release", "Writing"],
-    "notes": "Mention the import plugin and migration notes.",
-    "timeEstimate": 1800000,
-    "dueDay": "2026-08-07",
-    "isDone": false,
+    "title": "整理本周计划",
+    "project": "学习",
+    "tags": ["重要"],
+    "estimateMinutes": 30,
+    "dueDay": "2026-09-13",
+    "notes": "完成后检查遗漏项",
     "subTasks": [
-      {
-        "title": "Collect merged pull requests",
-        "estimateMinutes": 20
-      },
-      {
-        "title": "Send draft to support team",
-        "estimateMinutes": 10
-      }
+      { "title": "列出本周目标", "estimateMinutes": 10 }
     ]
-  },
-  {
-    "title": "Review analytics dashboard",
-    "project": "Growth Experiments",
-    "tags": ["Analytics"],
-    "description": "Check weekly conversion changes before planning.",
-    "estimateMs": 1200000,
-    "date": "2026-08-08"
   }
 ]
 ```
 
-Required field: `title`.
+## 字段
 
-Optional create fields: `projectId`, `tagIds`, `notes`, `timeEstimate`, `parentId`, `isDone`, `dueDay`.
+- 必填：`title`
+- 常用可选：`project`、`projectId`、`tags`、`tagIds`、`notes`、`timeEstimate`、`estimateMinutes`、`isDone`、`dueDay`、`parentId`、`subTasks`
+- 常用别名：`name`/`summary` → `title`，`description`/`note`/`content` → `notes`，`date`/`dueDate` → `dueDay`，`children`/`subtasks` → `subTasks`
 
-Optional post-create update fields: `timeSpent`, `timeSpentOnDay`, `doneOn`, `attachments`, `remindAt`, `dueWithTime`, `repeatCfgId`, `issueId`, `issueProviderId`, `issueType`, `issueWasUpdated`, `issueLastUpdated`, `issueAttachmentNr`, `issuePoints`.
+项目和标签 ID 必须已存在；使用名称时，插件可以在确认后创建缺失项。子任务继承父任务的项目和标签，只支持一层嵌套。
 
-Convenience aliases:
+## 打包
 
-- `description`, `note`, `content` -> `notes`
-- `estimateMs` -> `timeEstimate`
-- `estimateMinutes` -> converted to milliseconds
-- `dueDate`, `date` -> `dueDay`
-- `tags` -> `tagIds`
-- `project` -> `projectId`
-- `subtasks`, `children` -> `subTasks`
-
-`projectId` and `tagIds` are treated as ids and must exist in Super Productivity. `project` and `tags` are resolved by existing titles. If a title does not exist, the plugin asks whether it should create the missing project or tag before importing.
-
-`Today` is a view, not a normal tag. Use `dueDay` to schedule a task for a day.
-
-Super Productivity supports root tasks and one subtask level. Nested subtasks deeper than that are rejected by this plugin. Subtasks inherit their parent project and tags, so `project`, `projectId`, `tags`, and `tagIds` on subtasks are ignored with a warning.
-Subtask dueDay requires Super Productivity 18.19.0 or newer.
-
-## Build ZIP
-
-Create a flat ZIP containing `manifest.json`, `plugin.js`, `index.html`, `icon.svg`, and `README.md`, then upload it from Super Productivity settings.
+ZIP 根目录包含 `manifest.json`、`plugin.js`、`index.html`、`icon.svg`、`README.md` 和 `CHANGELOG.md`。
